@@ -93,3 +93,5 @@ enum {
     NBA_CLR_LISTS,	// Clear database lists
     NBA_HELLOCHK,	// Start, stop NBMA hellos
 };
+
+SpfNbr *GetNextAdj(void);

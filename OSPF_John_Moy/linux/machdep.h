@@ -90,4 +90,4 @@ inline uns16 hton16(uns16 value)
 }
 
 // External definitions
-extern "C" char *strptime(char *buf, const char *format, const struct tm *tm);
+//extern "C" char *strptime(char *buf, const char *format, const struct tm *tm);

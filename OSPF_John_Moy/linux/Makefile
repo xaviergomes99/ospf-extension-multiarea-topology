@@ -3,8 +3,8 @@ vpath %.C .:../src
 vpath %.c ../src/contrib
 
 INSTALL_DIR = /usr/sbin
-CGI_DIR = /home/httpd/cgi-bin
-CPPFLAGS = -I. -I../src -I/usr/local/include
+CGI_DIR = /usr/lib/cgi-bin
+CPPFLAGS = -I. -I../src -I/usr/local/include "-DUSE_INTERP_ERRORLINE" # ErrorLine is deprecated, requires flag
 CXXFLAGS = -O -g -Wall -Woverloaded-virtual -Wcast-qual -Wuninitialized
 CFLAGS = -O -g -Wall -Woverloaded-virtual -Wcast-qual -Wuninitialized
 

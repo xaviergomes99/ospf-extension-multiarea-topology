@@ -22,7 +22,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <tcl.h>
+#include <tcl/tcl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>

@@ -22,7 +22,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <tcl.h>
+#include <tcl/tcl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -1786,11 +1786,11 @@ char *page_footer = "\
 
 char *error_page = "\
     <table cellpadding=0 cellspacing=0 border=0 width=400>\n\
-    <center>
+    <center>\
     <tr>\n\
     <td align=\"center\">\n\
     Data connection error:\n\
-    <br>
+    <br>\
     $operation$: $errno$\n\
     </td>\n\
     </tr>\n\

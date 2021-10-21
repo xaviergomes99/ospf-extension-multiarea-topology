@@ -228,14 +228,14 @@ InMask masks[33] = {
     0xffffffffL
 };
 
-bool get_prefix(char *prefix, InAddr &net, InMask &mask)
+bool get_prefix(const char *prefix, InAddr &net, InMask &mask)
 
 {
     char *string;
     char netstr[16];
     int len;
 
-    if (!(string = index(prefix, '/')))
+    if (!(string = index((char *) prefix, '/')))
 	return(false);
     memcpy(netstr, prefix, string-prefix);
     netstr[string-prefix] = '\0';

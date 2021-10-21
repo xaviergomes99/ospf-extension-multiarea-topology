@@ -23,7 +23,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <unistd.h>
-#include <tcl.h>
+#include <tcl/tcl.h>
 #if LINUX_VERSION_CODE >= LINUX22
 #include <asm/types.h>
 #include <sys/socket.h>
@@ -61,7 +61,7 @@ LinuxOspfd *ospfd_sys;
 char buffer[MAX_IP_PKTSIZE];
 
 // External declarations
-bool get_prefix(char *prefix, InAddr &net, InMask &mask);
+bool get_prefix(const char *prefix, InAddr &net, InMask &mask);
 
 /* Signal handlers
  */
@@ -497,16 +497,16 @@ LinuxOspfd::~LinuxOspfd()
  * application.
  */
 
-int SetRouterID(ClientData, Tcl_Interp *, int, char *argv[]);
-int SendGeneral(ClientData, Tcl_Interp *, int, char *argv[]);
-int SendArea(ClientData, Tcl_Interp *, int, char *argv[]);
-int SendAggregate(ClientData, Tcl_Interp *, int, char *argv[]);
-int SendHost(ClientData, Tcl_Interp *, int, char *argv[]);
-int SendInterface(ClientData, Tcl_Interp *, int, char *argv[]);
-int SendVL(ClientData, Tcl_Interp *, int, char *argv[]);
-int SendNeighbor(ClientData, Tcl_Interp *, int, char *argv[]);
-int SendExtRt(ClientData, Tcl_Interp *, int, char *argv[]);
-int SendMD5Key(ClientData, Tcl_Interp *, int, char *argv[]);
+int SetRouterID(ClientData, Tcl_Interp *, int, const char *argv[]);
+int SendGeneral(ClientData, Tcl_Interp *, int, const char *argv[]);
+int SendArea(ClientData, Tcl_Interp *, int, const char *argv[]);
+int SendAggregate(ClientData, Tcl_Interp *, int, const char *argv[]);
+int SendHost(ClientData, Tcl_Interp *, int, const char *argv[]);
+int SendInterface(ClientData, Tcl_Interp *, int, const char *argv[]);
+int SendVL(ClientData, Tcl_Interp *, int, const char *argv[]);
+int SendNeighbor(ClientData, Tcl_Interp *, int, const char *argv[]);
+int SendExtRt(ClientData, Tcl_Interp *, int, const char *argv[]);
+int SendMD5Key(ClientData, Tcl_Interp *, int, const char *argv[]);
 
 /* Read the ospfd config out of the file /etc/ospfd.conf
  */
@@ -813,7 +813,7 @@ void LinuxOspfd::add_direct(BSDPhyInt *phyp, InAddr addr, InMask mask)
  * or a name like "eth0".
  */
 
-bool LinuxOspfd::parse_interface(char *arg, in_addr &addr, BSDPhyInt *&phyp)
+bool LinuxOspfd::parse_interface(const char *arg, in_addr &addr, BSDPhyInt *&phyp)
 
 {
     phyp = 0;
@@ -851,7 +851,7 @@ bool LinuxOspfd::parse_interface(char *arg, in_addr &addr, BSDPhyInt *&phyp)
  * been set.
  */
 
-int SetRouterID(ClientData, Tcl_Interp *, int, char *argv[])
+int SetRouterID(ClientData, Tcl_Interp *, int, const char *argv[])
 
 {
     new_router_id = ntoh32(inet_addr(argv[1]));
@@ -865,7 +865,7 @@ int SetRouterID(ClientData, Tcl_Interp *, int, char *argv[])
  * If first time, create OSPF protocol instance.
  */
 
-int SendGeneral(ClientData, Tcl_Interp *, int, char *argv[])
+int SendGeneral(ClientData, Tcl_Interp *, int, const char *argv[])
 
 {
     CfgGen m;
@@ -890,7 +890,7 @@ int SendGeneral(ClientData, Tcl_Interp *, int, char *argv[])
 /* Dowload configuration of a single area
  */
 
-int SendArea(ClientData, Tcl_Interp *, int, char *argv[])
+int SendArea(ClientData, Tcl_Interp *, int, const char *argv[])
 
 {
     CfgArea m;
@@ -904,7 +904,7 @@ int SendArea(ClientData, Tcl_Interp *, int, char *argv[])
     return(TCL_OK);
 }
 
-int SendAggregate(ClientData, Tcl_Interp *, int, char *argv[])
+int SendAggregate(ClientData, Tcl_Interp *, int, const char *argv[])
 {
     CfgRnge m;
     InAddr net;
@@ -921,7 +921,7 @@ int SendAggregate(ClientData, Tcl_Interp *, int, char *argv[])
     return(TCL_OK);
 }
 
-int SendHost(ClientData, Tcl_Interp *, int, char *argv[])
+int SendHost(ClientData, Tcl_Interp *, int, const char *argv[])
 {
     CfgHost m;
     InAddr net;
@@ -943,7 +943,7 @@ int SendHost(ClientData, Tcl_Interp *, int, char *argv[])
  * for point-to-point addresses, the other end of the link.
  */
 
-int SendInterface(ClientData, Tcl_Interp *, int, char *argv[])
+int SendInterface(ClientData, Tcl_Interp *, int, const char *argv[])
 
 {
     CfgIfc m;
@@ -999,7 +999,7 @@ int SendInterface(ClientData, Tcl_Interp *, int, char *argv[])
     return(TCL_OK);
 }
 
-int SendVL(ClientData, Tcl_Interp *, int, char *argv[])
+int SendVL(ClientData, Tcl_Interp *, int, const char *argv[])
 {
     CfgVL m;
 
@@ -1016,7 +1016,7 @@ int SendVL(ClientData, Tcl_Interp *, int, char *argv[])
     return(TCL_OK);
 }
 
-int SendNeighbor(ClientData, Tcl_Interp *, int, char *argv[])
+int SendNeighbor(ClientData, Tcl_Interp *, int, const char *argv[])
 {
     CfgNbr m;
 
@@ -1027,7 +1027,7 @@ int SendNeighbor(ClientData, Tcl_Interp *, int, char *argv[])
     return(TCL_OK);
 }
 
-int SendExtRt(ClientData, Tcl_Interp *, int, char *argv[])
+int SendExtRt(ClientData, Tcl_Interp *, int, const char *argv[])
 {
     CfgExRt m;
     InAddr net;
@@ -1049,7 +1049,7 @@ int SendExtRt(ClientData, Tcl_Interp *, int, char *argv[])
     return(TCL_OK);
 }
 
-int SendMD5Key(ClientData, Tcl_Interp *, int, char *argv[])
+int SendMD5Key(ClientData, Tcl_Interp *, int, const char *argv[])
 {
     CfgAuKey m;
     in_addr addr;

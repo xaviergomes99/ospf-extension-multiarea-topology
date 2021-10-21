@@ -70,7 +70,7 @@ class LinuxOspfd : public Linux {
     void rtentry_prepare(InAddr, InMask, MPath *mpp);
     void add_direct(class BSDPhyInt *, InAddr, InMask);
     int get_phyint(InAddr);
-    bool parse_interface(char *, in_addr &, BSDPhyInt * &);
+    bool parse_interface(const char *, in_addr &, BSDPhyInt * &);
     void raw_receive(int fd);
     void netlink_receive(int fd);
     void process_routerid_change();
@@ -85,12 +85,16 @@ class LinuxOspfd : public Linux {
  */
 
 class BSDPhyInt : public AVLitem {
-    char *phyname;
+public:
+    inline int phyint();
     InAddr addr;
-    short flags;
     InMask mask;
-    InAddr dstaddr;	// Other end of p-p link
     int mtu;
+    short flags;
+
+private:
+    char *phyname;
+    InAddr dstaddr;	// Other end of p-p link
     bool tunl;
     int vifno;
     InAddr tsrc;	// Tunnel endpoint addresses
@@ -100,7 +104,6 @@ class BSDPhyInt : public AVLitem {
     friend class LinuxOspfd;
     friend int SendInterface(void *,struct Tcl_Interp *, int,char *[]);
     friend int SendMD5Key(void *, Tcl_Interp *, int, char *argv[]);
-    inline int phyint();
 };
 
 inline BSDPhyInt::BSDPhyInt(int index) : AVLitem(index, 0)
