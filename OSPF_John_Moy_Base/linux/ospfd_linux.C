@@ -46,7 +46,7 @@
 #define _LINUX_SOCKIOS_H
 #define _LINUX_IN_H
 #include <linux/mroute.h>
-#include <netinet/ip.h>
+//#include <netinet/ip.h>
 #include <linux/if_tunnel.h>
 #include <net/if_arp.h>
 #include "../src/ospfinc.h"
