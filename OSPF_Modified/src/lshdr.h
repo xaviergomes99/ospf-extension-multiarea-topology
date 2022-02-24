@@ -181,6 +181,11 @@ struct GMref {
 enum {
     OPQ_T_TE = 1,	// Traffic Engineering extensions
     OPQ_T_HLRST = 3,	// Hitless restart extensions
+    
+    //Extension to support multi-area arbitrary topologies 
+    OPQ_T_MULTI_ABR = 4,    //ABR-LSA
+    OPQ_T_MULTI_PREFIX = 5,    //Prefix-LSA
+    OPQ_T_MULTI_ASBR = 6,    //ASBR-LSA
 };
 
 /* Format of the TLVs found in the body of some Opaque-LSAs.
