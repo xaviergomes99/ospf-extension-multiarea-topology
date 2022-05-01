@@ -335,15 +335,15 @@ bool SpfIfc::suppress_this_hello(SpfNbr *np)
     if (np && np->hellos_suppressed && np->n_state == NBS_FULL)
         return(true);
     if (if_demand && !elects_dr() && !np) {
-	if_demand_helapse += if_hint;
-	if (if_demand_helapse < if_pint)
-	    return(false);
-	else if (if_demand_helapse >= 2*if_pint) {
-	    if_demand_helapse = if_pint;
-	    return(false);
-	}
-	else
-	    return(true);
+        if_demand_helapse += if_hint;
+        if (if_demand_helapse < if_pint)
+            return(false);
+        else if (if_demand_helapse >= 2*if_pint) {
+            if_demand_helapse = if_pint;
+            return(false);
+        }
+        else
+            return(true);
     }
     return(false);
 }

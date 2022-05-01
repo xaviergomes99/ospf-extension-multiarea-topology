@@ -57,8 +57,8 @@ void OSPF::asbr_orig(ASBRrte *rte)
     AreaIterator aiter(ospf);
 
     while ((ap = aiter.get_next())) {
-	if (ap->n_active_if != 0)
-	    ap->asbr_orig(rte, 0);
+        if (ap->n_active_if != 0)
+            ap->asbr_orig(rte, 0);
     }
 }
 
@@ -88,27 +88,27 @@ void SpfArea::asbr_orig(ASBRrte *rte, int forced)
 	    goto get_seqno;
     }
     else if (a_stub)
-	cost = LSInfinity;
+	    cost = LSInfinity;
     else if (!rte->valid())
-	cost = LSInfinity;
+	    cost = LSInfinity;
     else if (rte->r_mpath->all_in_area(this))
-	cost = LSInfinity;
+	    cost = LSInfinity;
     else if (rte->type() == RT_SPF || rte->type() == RT_SPFIA) {
-	home = rte->area();
-	cost = rte->cost;
+        home = rte->area();
+        cost = rte->cost;
     }
     else
-	cost = LSInfinity;
+	    cost = LSInfinity;
 
     // Don't originate into same area
     if (cost == LSInfinity || a_id == home) {
-	lsa_flush(olsap);
-	return;
+        lsa_flush(olsap);
+        return;
     }
 
  get_seqno:
     if ((seqno = ospf->ospf_get_seqno(LST_ASBR,olsap, forced)) == InvalidLSSeq)
-	return;
+	    return;
 
     // Fill in LSA contents
     // Header
@@ -117,9 +117,9 @@ void SpfArea::asbr_orig(ASBRrte *rte, int forced)
     if (ls_id != ospf->my_id())
         hdr->ls_opts |= SPO_DC;
     if (!a_stub)
-	hdr->ls_opts |= SPO_EXT;
+	    hdr->ls_opts |= SPO_EXT;
     if (ospf->mc_abr())
-	hdr->ls_opts |= SPO_MC;
+	    hdr->ls_opts |= SPO_MC;
     hdr->ls_type = LST_ASBR;
     hdr->ls_id = hton32(ls_id);
     hdr->ls_org = hton32(ospf->my_id());

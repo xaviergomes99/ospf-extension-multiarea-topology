@@ -49,23 +49,23 @@ void LSA::start_aging()
     uns16 bin;
 
     if (in_agebin)
-	stop_aging();
+	    stop_aging();
     if (lsa_rcvage == MaxAge) {
-	lsa_agebin = Age2Bin((age_t) 0);
-	ospf->MaxAge_list.addEntry(this);
-	return;
+        lsa_agebin = Age2Bin((age_t) 0);
+        ospf->MaxAge_list.addEntry(this);
+        return;
     }
     else if ((lsa_rcvage & DoNotAge) != 0)
-	bin = Age2Bin((age_t) 0);
+	    bin = Age2Bin((age_t) 0);
     else
-	bin = Age2Bin(lsa_rcvage);
+	    bin = Age2Bin(lsa_rcvage);
 
     in_agebin = true;
     lsa_agebin = bin;
     lsa_agefwd = AgeBins[bin];
     lsa_agerv = 0;
     if (AgeBins[bin])
-	AgeBins[bin]->lsa_agerv = this;
+	    AgeBins[bin]->lsa_agerv = this;
     AgeBins[bin] = this;
 }
 

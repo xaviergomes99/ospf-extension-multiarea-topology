@@ -56,3 +56,28 @@ class OpqHoldQ : public AVLitem {
     OpqHoldQ(int conn_id);
     friend class OSPF;
 };
+
+class overlayAbrLSA : public opqLSA, public PriQElt {
+    RTRrte *t_dest;    // Destination routing table entry
+    byte cost;      // Intra area cost to this ABR
+    byte t_state;   // Current state of this ABR, in the dijkstra calc
+public:
+    virtual void parse(LShdr *hdr);
+    virtual void unparse();
+}
+
+class overlayPrefixLSA : public opqLSA {
+    byte adv_cost;  //cost advertised by sender
+public:
+    virtual void parse(LShdr *hdr);
+    virtual void unparse();
+}
+
+class overlayAsbrLSA : public opqLSA {
+    byte adv_cost;  //cost advertised by sender
+public:
+    virtual void parse(LShdr *hdr);
+    virtual void unparse();
+}
+    
+    

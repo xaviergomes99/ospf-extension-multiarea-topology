@@ -55,6 +55,13 @@ void opqLSA::parse(LShdr *hdr)
     // Certain Opaque-LSAs are used by OSPF extensions
     if (lsa_type == LST_LINK_OPQ && ls_id() == (OPQ_T_HLRST<<24))
         ospf->grace_LSA_rx(this, hdr);
+    
+    if (lsa_type == LST_AS_OPQ && ls_id() == (OPQ_T_MULTI_ABR<<24))
+        //TODO parse ABR-LSA
+    if (lsa_type == LST_AS_OPQ && ls_id() == (OPQ_T_MULTI_PREFIX<<24))
+        //TODO parse Prefix-LSA
+    if (lsa_type == LST_AS_OPQ && ls_id() == (OPQ_T_MULTI_ASBR<<24))
+        //TODO parse ASBR-LSA
 }
 
 /* Unparse an opaque-LSA.
@@ -66,6 +73,13 @@ void opqLSA::unparse()
     // Certain Opaque-LSAs are used by OSPF extensions
     if (lsa_type == LST_LINK_OPQ && ls_id() == (OPQ_T_HLRST<<24))
         ospf->grace_LSA_flushed(this);
+
+    if (lsa_type == LST_AS_OPQ && ls_id() == (OPQ_T_MULTI_ABR<<24))
+        //TODO unparse ABR-LSA
+    if (lsa_type == LST_AS_OPQ && ls_id() == (OPQ_T_MULTI_PREFIX<<24))
+        //TODO unparse Prefix-LSA
+    if (lsa_type == LST_AS_OPQ && ls_id() == (OPQ_T_MULTI_ASBR<<24))
+        //TODO unparse ASBR-LSA
 }
 
 /* Build an opaque-LSA. Since the parse function

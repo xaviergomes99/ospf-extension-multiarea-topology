@@ -188,6 +188,22 @@ enum {
     OPQ_T_MULTI_ASBR = 6,    //ASBR-LSA
 };
 
+struct ABRhdr { //body of ABR-LSA, per neighbor
+    uns32 metric;       //intra-area cost to neighbor (only 1 byte)
+    uns32 neigh_rid;    //neighbor RID
+};
+
+struct Prefixhdr { //body of Prefix-LSA
+    uns32 metric;       //intra-area cost to prefix (only 1 byte)
+    uns32 subnet_mask;  //prefix mask
+    uns32 subnet_addr;  //prefix address
+};
+
+struct ASBRhdr { //body of ASBR-LSA
+    byte metric;        //intra-area cost to ASBR (only 1 byte)
+    uns32 dest_rid;     //ASBR RID
+};
+
 /* Format of the TLVs found in the body of some Opaque-LSAs.
  * Length field covers only the body, not the header, and
  * when the length is not a multiple of 4 bytes, the TLV

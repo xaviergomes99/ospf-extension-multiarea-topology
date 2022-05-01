@@ -358,7 +358,7 @@ RTRrte *SpfArea::add_abr(uns32 rtrid)
     ASBRrte *asbr;
 
     if ((rte = (RTRrte *) abr_tbl.find(rtrid)))
-	return(rte);
+	    return(rte);
 
     rte = new RTRrte(rtrid, this);
     abr_tbl.add(rte);

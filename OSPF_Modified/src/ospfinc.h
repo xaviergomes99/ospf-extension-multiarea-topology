@@ -48,3 +48,4 @@
 #include "dbage.h"
 #include "iterator.h"
 #include "globals.h"
+#include "opqlsa.h"

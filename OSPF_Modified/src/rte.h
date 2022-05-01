@@ -115,6 +115,7 @@ class RTE : public AVLitem {
     MPath *last_mpath; 	// Last set of Next hops given to kernel
     uns32 cost;		// Cost of routing table entry
     uns32 t2cost;	// Type 2 cost of entry
+    bool sent_overlay;  // Flag indicationg this entry has been advertised to the ABR overlay
 
     RTE(uns32 key_a, uns32 key_b);
     void new_intra(TNode *V, bool stub, uns16 stub_cost, int index);
@@ -134,6 +135,7 @@ class RTE : public AVLitem {
     inline int inter_area();
     inline int intra_AS();
     inline aid_t area();
+    inline void advertise_overlay();
 
     friend class SpfArea;
     friend class summLSA;
@@ -168,6 +170,10 @@ inline int RTE::intra_AS()
 inline aid_t RTE::area()
 {
     return((r_ospf != 0) ? r_ospf->r_area : 0);
+}
+inline void RTE::advertise_overlay()
+{
+    sent_overlay = true;
 }
 
 /* Definition of the IP routing table entry. Organized as a balanced

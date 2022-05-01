@@ -311,7 +311,7 @@ INrte *INtbl::add(uns32 net, uns32 mask)
     INiterator iter(this);
 
     if ((rte = (INrte *) root.find(net, mask)))
-	return(rte);
+	    return(rte);
     // Add to routing table entry
     rte = new INrte(net, mask);
     root.add(rte);
@@ -319,17 +319,17 @@ INrte *INtbl::add(uns32 net, uns32 mask)
     rte->_prefix = 0;
     parent = (INrte *) root.previous(net, mask);
     for (; parent; parent = parent->prefix()) {
-	if (rte->is_child(parent)) {
-	    rte->_prefix = parent;
-	    break;
-	}
+        if (rte->is_child(parent)) {
+            rte->_prefix = parent;
+            break;
+        }
     }
     // Set children's parent pointers
     iter.seek(rte);
     while ((child = iter.nextrte()) && child->is_child(rte)) {
-	if (child->prefix() && child->prefix()->is_child(rte))
-	    continue;
-	child->_prefix = rte;
+        if (child->prefix() && child->prefix()->is_child(rte))
+            continue;
+        child->_prefix = rte;
     }
 
     return(rte);

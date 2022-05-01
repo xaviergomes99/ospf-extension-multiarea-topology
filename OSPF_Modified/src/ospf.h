@@ -169,6 +169,14 @@ class OSPF : public ConfigItem {
     SPFtime start_time;
     int n_helping;	// # neighbors being helped
 
+    //Multi-area extension variables
+    //TODO list of all the overlay generated routes???
+    AVLtree abrLSAs;    // ABR-LSAs
+    AVLtree ABRtree;    // AVL tree of all the ABRs
+    bool first_overlay_lsas_sent;
+    int n_abrs;     // # of reachable ABRs
+    uns32 n_overlay_dijkstras;
+
     // Monitoring routines
     class MonMsg *get_monbuf(int size);
     void global_stats(class MonMsg *, int conn_id);
@@ -309,6 +317,16 @@ class OSPF : public ConfigItem {
     void htl_check_consistency(SpfArea *, LShdr *);
     void exit_hitless_restart(char *reason);
     void htl_reorig(AVLtree *);
+
+    // Multi-area arbitrary topologies extension
+    RTRrte *add_abr(uns32 rtrid);
+    void nb_max_state_achieved();
+    void send_first_overlay_lsas();
+    void send_abr_lsa();
+    void send_prefix_lsa(INrte *rte);
+    void send_asbr_lsa(ASBRrte *rte);
+    void overlay_calc();
+    void overlay_dijkstra();
 
     // Logging routines
     bool spflog(int, int);
