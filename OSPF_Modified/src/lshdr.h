@@ -181,6 +181,27 @@ struct GMref {
 enum {
     OPQ_T_TE = 1,	// Traffic Engineering extensions
     OPQ_T_HLRST = 3,	// Hitless restart extensions
+    
+    //Extension to support multi-area arbitrary topologies 
+    OPQ_T_MULTI_ABR = 5,    //ABR-LSA
+    OPQ_T_MULTI_PREFIX = 6,    //Prefix-LSA
+    OPQ_T_MULTI_ASBR = 7,    //ASBR-LSA
+};
+
+struct ABRhdr { //body of ABR-LSA, per neighbor
+    uns32 metric;       //intra-area cost to neighbor (only 1 byte)
+    uns32 neigh_rid;    //neighbor RID
+};
+
+struct Prefixhdr { //body of Prefix-LSA
+    uns32 metric;       //intra-area cost to prefix (only 1 byte)
+    uns32 subnet_mask;  //prefix mask
+    uns32 subnet_addr;  //prefix address
+};
+
+struct ASBRhdr { //body of ASBR-LSA
+    byte metric;        //intra-area cost to ASBR (only 1 byte)
+    uns32 dest_rid;     //ASBR RID
 };
 
 /* Format of the TLVs found in the body of some Opaque-LSAs.

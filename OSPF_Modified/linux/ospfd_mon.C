@@ -158,6 +158,8 @@ int main(int argc, char *argv[])
 	}
 	else if (strncmp(buffer, "exit", 4) == 0)
 	    exit(0);
+	else if (strncmp(buffer, "opq", 2) == 0)
+		get_database(LST_AS_OPQ);
 	else
 	    syntax();
     }
@@ -423,7 +425,7 @@ void get_database(byte lstype)
     int n_lsas = 0;
     uns32 xsum = 0;
 
-    if (lstype != LST_ASL) {
+    if (lstype != LST_ASL && lstype != LST_AS_OPQ) {
 	char *ptr;
 	ptr = buffer;
 	if (!strsep(&ptr, " ")) {
@@ -478,6 +480,8 @@ void get_database(byte lstype)
 	new_lstype = ntoh32(m->body.lsarq.ls_type);
 	if (new_lstype != lstype) {
 	    if (lstype == LST_ASL || new_lstype == LST_ASL)
+		break;
+		if (lstype == LST_AS_OPQ || new_lstype == LST_AS_OPQ)
 		break;
 	}
 	ls_id = ntoh32(m->body.lsarq.ls_id);
@@ -814,6 +818,7 @@ void syntax()
     printf("adv %%type %%ls_id %%adv_rtr %%area_id\n");
     printf("areas\n");
     printf("as-externals\n");
+	printf("opq\n");
     printf("interfaces\n");
     printf("neighbors\n");
     printf("database %%area_id\n");

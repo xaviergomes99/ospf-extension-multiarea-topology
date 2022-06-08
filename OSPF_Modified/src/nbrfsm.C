@@ -148,90 +148,90 @@ void SpfNbr::nbr_fsm(int event)
     action = ospf->run_fsm(&NbrFsm[0], n_state, event);
 
     switch (action) {
-      case 0:		// No associated action
-	break;
-      case NBA_START:
-	send_hello();
-	n_htim.start(n_ifp->if_hint*Timer::SECOND);
-	n_acttim.start(n_ifp->if_dint*Timer::SECOND);
-	break;
-      case NBA_RST_IATIM:
-	n_acttim.restart(n_ifp->if_dint*Timer::SECOND);
-	break;
-      case NBA_ST_IATIM:
-	n_acttim.start(n_ifp->if_dint*Timer::SECOND);
-	break;
-      case NBA_EVAL1:
-	nba_eval1();
-	break;
-      case NBA_EVAL2:
-	nba_eval2();
-	break;
-      case NBA_SNAPSHOT:
-	nba_snapshot();
-	break;
-      case NBA_EXCHDONE:
-	nba_exchdone();
-	break;
-      case NBA_REEVAL:
-	nba_reeval();
-	break;
-      case NBA_RESTART_DD:
-	nba_clr_lists();
-	AddPendAdj();
-	break;
-      case NBA_DELETE:
-	nba_delete();
-	break;
-      case NBA_CLR_LISTS:
-	nba_clr_lists();
-	break;
-      case NBA_HELLOCHK:
+        case 0:		// No associated action
+            break;
+        case NBA_START:
+            send_hello();
+            n_htim.start(n_ifp->if_hint*Timer::SECOND);
+            n_acttim.start(n_ifp->if_dint*Timer::SECOND);
+            break;
+        case NBA_RST_IATIM:
+            n_acttim.restart(n_ifp->if_dint*Timer::SECOND);
+            break;
+        case NBA_ST_IATIM:
+            n_acttim.start(n_ifp->if_dint*Timer::SECOND);
+            break;
+        case NBA_EVAL1:
+            nba_eval1();
+            break;
+        case NBA_EVAL2:
+            nba_eval2();
+            break;
+        case NBA_SNAPSHOT:
+            nba_snapshot();
+            break;
+        case NBA_EXCHDONE:
+            nba_exchdone();
+            break;
+        case NBA_REEVAL:
+            nba_reeval();
+            break;
+        case NBA_RESTART_DD:
+            nba_clr_lists();
+            AddPendAdj();
+            break;
+        case NBA_DELETE:
+            nba_delete();
+            break;
+        case NBA_CLR_LISTS:
+            nba_clr_lists();
+            break;
+        case NBA_HELLOCHK:
 	/* Here we are not yet ready to form adjacencies,
 	 * but reevaluation of whether an adjacency should
 	 * form lets us set the Hello Interval
 	 * appropriately on non-broadcast interfaces.
 	 */
-	if (n_ifp->type() != IFT_NBMA && n_ifp->type() != IFT_P2MP)
-	    break;
-	if (!n_ifp->adjacency_wanted(this) && n_state == NBS_ATTEMPT) {
-	    n_state = NBS_DOWN;
-	    nba_delete();
-	    break;
-	}
-	if (n_ifp->adjacency_wanted(this) && n_state == NBS_DOWN)
-	    n_state = NBS_ATTEMPT;
-	n_ifp->adjust_hello_interval(this);
-	break;
-      case -1:		// FSM error
-      default:
-	if (ospf->spflog(ERR_NBR_FSM, 5)) {
-	    ospf->log(nbrevents(event));
-	    ospf->log("state ");
-	    ospf->log(nbrstates(n_state));
-	    ospf->log(this);
-	}
-	return;
+            if (n_ifp->type() != IFT_NBMA && n_ifp->type() != IFT_P2MP)
+                break;
+            if (!n_ifp->adjacency_wanted(this) && n_state == NBS_ATTEMPT) {
+                n_state = NBS_DOWN;
+                nba_delete();
+                break;
+            }
+            if (n_ifp->adjacency_wanted(this) && n_state == NBS_DOWN)
+                n_state = NBS_ATTEMPT;
+            n_ifp->adjust_hello_interval(this);
+            break;
+        case -1:		// FSM error
+        default:
+            if (ospf->spflog(ERR_NBR_FSM, 5)) {
+                ospf->log(nbrevents(event));
+                ospf->log("state ");
+                ospf->log(nbrstates(n_state));
+                ospf->log(this);
+            }
+            return;
     }
 
     if (n_ostate == n_state)
-	return;
+	    return;
     // State change
     // Log significant events
     if (n_state < n_ostate)
-	llevel = 5;
+	    llevel = 5;
     else if (n_state == NBS_FULL ||
 	     (n_state == NBS_2WAY && (!n_adj_pend)))
-	llevel = 4;
+	    llevel = 4;
     else
-	llevel = 1;
+	    llevel = 1;
     if (ospf->spflog(NBR_STATECH, llevel)) {
-	ospf->log(nbrstates(n_state));
-	ospf->log("<-");
-	ospf->log(nbrstates(n_ostate));
-	ospf->log(" event ");
-	ospf->log(nbrevents(event));
-	ospf->log(this);
+        ospf->log(nbrstates(n_state));
+        ospf->log("<-");
+        ospf->log(nbrstates(n_ostate));
+        ospf->log(" event ");
+        ospf->log(nbrevents(event));
+        ospf->log(this);
     }
 
     // Maintain count of adjacencies that we are
@@ -241,42 +241,42 @@ void SpfNbr::nbr_fsm(int event)
     // now Full
     if (n_state == NBS_FULL) {
         if (!we_are_helping() && n_ifp->if_nfull++ == 0)
-	    n_ifp->reorig_all_grplsas();
-	ospf->n_dbx_nbrs--;
-	n_progtim.stop();
-	exit_dbxchg();
-	if (tap && tap->n_VLs++ == 0)
-	    tap->rl_orig();
-	ap->rl_orig();
+	        n_ifp->reorig_all_grplsas();
+        ospf->n_dbx_nbrs--;
+        n_progtim.stop();
+        exit_dbxchg();
+        if (tap && tap->n_VLs++ == 0)
+            tap->rl_orig();
+        ap->rl_orig();
     }
     // beginning exchange
     else if (n_ostate <= NBS_EXST && n_state > NBS_EXST)
-	ospf->n_dbx_nbrs++;
+	    ospf->n_dbx_nbrs++;
     // Never go from Full state immed back into dbxchng
     else if (n_ostate == NBS_FULL) {
-	if (!we_are_helping()) {
-	    if (n_ifp->if_nfull-- == 1)
-	        n_ifp->reorig_all_grplsas();
-	    if (tap && tap->n_VLs-- == 1)
-	        tap->rl_orig();
-	    ap->rl_orig();
-	}
+        if (!we_are_helping()) {
+            if (n_ifp->if_nfull-- == 1)
+                n_ifp->reorig_all_grplsas();
+            if (tap && tap->n_VLs-- == 1)
+                tap->rl_orig();
+            ap->rl_orig();
+        }
     }
     else if (n_state <= NBS_2WAY && n_ostate >= NBS_EXST) {
-	exit_dbxchg();
-	if (n_ostate > NBS_EXST)
-	    ospf->n_dbx_nbrs--;
+        exit_dbxchg();
+        if (n_ostate > NBS_EXST)
+            ospf->n_dbx_nbrs--;
     }
 
     // (Re)originate network-LSA if we're DR
     if (n_ifp->state() == IFS_DR)
-	n_ifp->nl_orig(false);
+	    n_ifp->nl_orig(false);
 
     // If necessary, run Interface state machine with event
     // NeighborChange
     if ((n_state >= NBS_2WAY && n_ostate < NBS_2WAY) ||
 	(n_state < NBS_2WAY && n_ostate >= NBS_2WAY))
-	n_ifp->run_fsm(IFE_NCHG);
+        n_ifp->run_fsm(IFE_NCHG);
 }
 
 
@@ -293,17 +293,17 @@ void SpfNbr::nba_eval1()
     n_state = NBS_2WAY;
     n_ifp->adjust_hello_interval(this);
     if (!n_ifp->adjacency_wanted(this))
-	DelPendAdj();
+        DelPendAdj();
     else if (!n_ifp->more_adjacencies_needed(id()))
-	DelPendAdj();
+	    DelPendAdj();
     else if (ospf->n_lcl_inits < ospf->max_dds) {
-	n_state = NBS_EXST;
-	ospf->n_lcl_inits++;
-	DelPendAdj();
-	start_adjacency();
+	    n_state = NBS_EXST;
+        ospf->n_lcl_inits++;
+        DelPendAdj();
+        start_adjacency();
     }
     else
-	AddPendAdj();		
+	    AddPendAdj();		
 }
 
 /* Neighbor wants to form an adjacency with us. If adjacency is
@@ -316,17 +316,17 @@ void SpfNbr::nba_eval2()
 
 {
     if (!n_ifp->adjacency_wanted(this))
-	n_state = NBS_2WAY;
+	    n_state = NBS_2WAY;
     else if (ospf->n_rmt_inits < ospf->max_dds) {
-	n_rmt_init = true;
-	n_state = NBS_EXST;
-	ospf->n_rmt_inits++;
-	DelPendAdj();
-	start_adjacency();
+        n_rmt_init = true;
+        n_state = NBS_EXST;
+        ospf->n_rmt_inits++;
+        DelPendAdj();
+        start_adjacency();
     }
     else {
-	n_state = NBS_2WAY;
-	AddPendAdj();
+	    n_state = NBS_2WAY;
+	    AddPendAdj();
     }
 }
 
@@ -349,13 +349,13 @@ void SpfNbr::nba_snapshot()
     if (supports(SPO_OPQ))
         n_ifp->AddTypesToList(LST_AREA_OPQ, &n_ddlst);
     if ((n_opts & SPO_MC) != 0)
-	n_ifp->AddTypesToList(LST_GM, &n_ddlst);
+	    n_ifp->AddTypesToList(LST_GM, &n_ddlst);
     
     // AS-scoped
     if ((!n_ifp->is_virtual()) && (!n_ifp->area()->is_stub())) {
-	n_ifp->AddTypesToList(LST_ASL, &n_ddlst);
-	if (supports(SPO_OPQ))
-	    n_ifp->AddTypesToList(LST_AS_OPQ, &n_ddlst);
+	    n_ifp->AddTypesToList(LST_ASL, &n_ddlst);
+        if (supports(SPO_OPQ))
+            n_ifp->AddTypesToList(LST_AS_OPQ, &n_ddlst);
     }
 
     // Link-scoped
@@ -373,9 +373,9 @@ void SpfNbr::nba_exchdone()
 
 {
     if (n_rqlst.is_empty())
-	n_state = NBS_FULL;
+        n_state = NBS_FULL;
     else
-	n_state = NBS_LOAD;
+	    n_state = NBS_LOAD;
 }
 
 
@@ -390,8 +390,8 @@ void SpfNbr::nba_reeval()
 {
     n_ifp->adjust_hello_interval(this);
     if (!n_ifp->adjacency_wanted(this)) {
-	nba_clr_lists();
-	n_state = NBS_2WAY;
+        nba_clr_lists();
+        n_state = NBS_2WAY;
     }
 }
 
@@ -443,15 +443,15 @@ int DRIfc::adjacency_wanted(SpfNbr *np)
 
 {
     if (if_state == IFS_DR)
-	return(true);
+	    return(true);
     else if (if_state == IFS_BACKUP)
-	return(true);
+	    return(true);
     else if (np->is_dr())
-	return(true);
+	    return(true);
     else if (np->is_bdr())
-	return(true);
+	    return(true);
     else
-	return(false);
+	    return(false);
 }
 
 int P2mPIfc::adjacency_wanted(SpfNbr *np)
@@ -482,19 +482,19 @@ void SpfIfc::adjust_hello_interval(SpfNbr *np)
         period = if_pint*Timer::SECOND;
     else {
         period = if_hint*Timer::SECOND;
-	dead = if_dint*Timer::SECOND;
+	    dead = if_dint*Timer::SECOND;
     }
 
     // Reset Hello and Dead timers if intervals have changed
     if (period != np->n_htim.interval()) {
         np->n_htim.stop();
-	if (period != 0)
-	    np->n_htim.start(period);
+        if (period != 0)
+            np->n_htim.start(period);
     }
     if (dead != np->n_acttim.interval()) {
         np->n_acttim.stop();
-	if (dead != 0)
-	    np->n_acttim.start(dead);
+        if (dead != 0)
+            np->n_acttim.start(dead);
     }
 }
 
@@ -515,7 +515,7 @@ void SpfNbr::nba_delete()
     n_htim.stop();
 
     if (!configured())
-	ospf->delete_neighbors = true;
+	    ospf->delete_neighbors = true;
     else if (n_ifp->state() != IFS_DOWN)
         n_ifp->adjust_hello_interval(this);
 }
@@ -546,9 +546,9 @@ SpfNbr *GetNextAdj()
     SpfNbr *np;
 
     if (!(np = ospf->g_adj_head))
-	return(0);
+	    return(0);
     if (!(ospf->g_adj_head = np->n_next_pend))
-	ospf->g_adj_tail = 0;
+	    ospf->g_adj_tail = 0;
 
     np->n_adj_pend = false;
     return(np);
@@ -560,17 +560,17 @@ void SpfNbr::AddPendAdj()
 
 {
     if (n_adj_pend)
-	return;
+	    return;
 
     n_adj_pend = true;
     n_next_pend = 0;
     if (!ospf->g_adj_head) {
-	ospf->g_adj_head = this;
-	ospf->g_adj_tail = this;
+        ospf->g_adj_head = this;
+        ospf->g_adj_tail = this;
     }
     else {
-	ospf->g_adj_tail->n_next_pend = this;
-	ospf->g_adj_tail = this;
+        ospf->g_adj_tail->n_next_pend = this;
+        ospf->g_adj_tail = this;
     }
 }
 
@@ -587,15 +587,15 @@ void SpfNbr::DelPendAdj()
         return;
     prev = 0;
     for (ptr = &ospf->g_adj_head; ; prev = nbr, ptr = &nbr->n_next_pend) {
-	if (!(nbr = *ptr))
-	    return;
-	if (nbr == this)
-	    break;
+	    if (!(nbr = *ptr))
+	        return;
+	    if (nbr == this)
+	        break;
     }
 
     *ptr = n_next_pend;
     if (ospf->g_adj_tail == this)
-	ospf->g_adj_tail = prev;
+	    ospf->g_adj_tail = prev;
     n_adj_pend = false;
 }
 
@@ -608,9 +608,9 @@ void SpfNbr::exit_dbxchg()
 
 {
     if (n_rmt_init)
-	ospf->n_rmt_inits--;
+	    ospf->n_rmt_inits--;
     else
-	ospf->n_lcl_inits--;
+	    ospf->n_lcl_inits--;
     // Next time we may be locally initialized
     n_rmt_init = false;
 }

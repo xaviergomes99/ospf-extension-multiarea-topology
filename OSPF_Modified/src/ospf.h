@@ -169,6 +169,17 @@ class OSPF : public ConfigItem {
     SPFtime start_time;
     int n_helping;	// # neighbors being helped
 
+    //Multi-area extension variables
+    bool abr_changed;   // Changes to our ABR-LSA contents
+    overlayAbrLSA *myABRlsa; // Our ABR-LSA
+    AVLtree ABRNbrs;    // List of all our neighboring ABRs
+    AVLtree added_nbrs; // List of the currently added neighbors
+    AVLtree abrLSAs;    // List of all ABR-LSAs
+    AVLtree prefixLSAs; // List of all Prefix-LSAs 
+    AVLtree asbrLSAs;   // List of all ASBR-LSAs
+    AVLtree ABRtree;    // AVL tree of all the ABRs
+    uns32 n_overlay_dijkstras;
+
     // Monitoring routines
     class MonMsg *get_monbuf(int size);
     void global_stats(class MonMsg *, int conn_id);
@@ -310,6 +321,13 @@ class OSPF : public ConfigItem {
     void exit_hitless_restart(char *reason);
     void htl_reorig(AVLtree *);
 
+    // Multi-area arbitrary topologies extension
+    void orig_abrLSA();
+    RTRrte *add_abr(uns32 rtrid);
+
+    void overlay_calc();
+    void overlay_dijkstra();
+
     // Logging routines
     bool spflog(int, int);
     void log(int);
@@ -359,7 +377,7 @@ class OSPF : public ConfigItem {
     // Opaque-LSA API
     bool adv_link_opq(int phyint, InAddr, lsid_t, byte *, int len, bool);
     bool adv_area_opq(aid_t, lsid_t, byte *, int len, bool);
-    void adv_as_opq(lsid_t, byte *, int len, bool);
+    void adv_as_opq(lsid_t, byte *, int len, bool, int forced);
     void register_for_opqs(int conn_id, bool disconnect=false);
     bool get_next_opq(int, int &, InAddr &, aid_t &, struct LShdr * &);
     
@@ -400,6 +418,7 @@ class OSPF : public ConfigItem {
     friend class P2mPIfc;
     friend class RTE;
     friend class netLSA;
+    friend class rtrLSA;
     friend class HostAddr;
     friend class Range;
     friend class INrte;
@@ -411,6 +430,10 @@ class OSPF : public ConfigItem {
     friend class MPath;
     friend class ExRtData;
     friend class opqLSA;
+    friend class overlayAbrLSA;
+    friend class overlayPrefixLSA;
+    friend class overlayAsbrLSA;
+    friend class ABRNbr;
     friend class HitlessPrepTimer;
     friend class HitlessRSTTimer;
     friend void lsa_flush(class LSA *);

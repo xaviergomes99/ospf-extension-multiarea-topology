@@ -24,7 +24,6 @@
 
 #include "ospfinc.h"
 #include "system.h"
-#include "opqlsa.h"
 
 /* Find the AVL tree associated with this particular area
  * and LS type.
@@ -183,71 +182,71 @@ LSA *OSPF::AddLSA(SpfIfc *ip,SpfArea *ap,LSA *current,LShdr *hdr,bool changed)
     blen = ntoh16(hdr->ls_length) - sizeof(LShdr);
     if (current) {
         min_failed = current->since_received() < MinArrival;
-	old_rte = current->rtentry();
-	current->stop_aging();
-	update_lsdb_xsum(current, false);
+		old_rte = current->rtentry();
+		current->stop_aging();
+		update_lsdb_xsum(current, false);
     }
 
     if (current && current->refct == 0) {
-	// Update in place
-	if (changed)
-	    UnParseLSA(current);
-	lsap = current;
-	lsap->hdr_parse(hdr);
-	lsap->start_aging();
-	lsap->changed = changed;
-	lsap->deferring = false;
-	lsap->rollover = current->rollover;
-	lsap->min_failed = min_failed;
-	if (!changed) {
-	    update_lsdb_xsum(lsap, true);
-	    return(lsap);
-	}
+		// Update in place
+		if (changed)
+			UnParseLSA(current);
+		lsap = current;
+		lsap->hdr_parse(hdr);
+		lsap->start_aging();
+		lsap->changed = changed;
+		lsap->deferring = false;
+		lsap->rollover = current->rollover;
+		lsap->min_failed = min_failed;
+		if (!changed) {
+			update_lsdb_xsum(lsap, true);
+			return(lsap);
+		}
     }
     else {
-	switch (hdr->ls_type) {
-	  case LST_RTR:
-	    lsap = new rtrLSA(ap, hdr, blen);
-	    break;
-	  case LST_NET:
-	    lsap = new netLSA(ap, hdr, blen);
-	    break;
-	  case LST_SUMM:
-	    lsap = new summLSA(ap, hdr, blen);
-	    break;
-	  case LST_ASBR:
-	    lsap = new asbrLSA(ap, hdr, blen);
-	    break;
-	  case LST_ASL:
-	    lsap = new ASextLSA(hdr, blen);
-	    break;
-	  case LST_GM:
-	    lsap = new grpLSA(ap, hdr, blen);
-	    break;
-	  case LST_LINK_OPQ:
-	  case LST_AREA_OPQ:
-	  case LST_AS_OPQ:
-	    lsap = new opqLSA(ip, ap, hdr, blen);
-	    break;
-	  default:
-	    lsap = 0;
-	    sys->halt(HALT_LSTYPE, "Bad LS type");
-	    break;
-	}
+		switch (hdr->ls_type) {
+			case LST_RTR:
+				lsap = new rtrLSA(ap, hdr, blen);
+				break;
+			case LST_NET:
+				lsap = new netLSA(ap, hdr, blen);
+				break;
+			case LST_SUMM:
+				lsap = new summLSA(ap, hdr, blen);
+				break;
+			case LST_ASBR:
+				lsap = new asbrLSA(ap, hdr, blen);
+				break;
+			case LST_ASL:
+				lsap = new ASextLSA(hdr, blen);
+				break;
+			case LST_GM:
+				lsap = new grpLSA(ap, hdr, blen);
+				break;
+			case LST_LINK_OPQ:
+			case LST_AREA_OPQ:
+			case LST_AS_OPQ:
+				lsap = new opqLSA(ip, ap, hdr, blen);
+				break;
+			default:
+				lsap = 0;
+				sys->halt(HALT_LSTYPE, "Bad LS type");
+				break;
+		}
 
-	// If database copy, unparse it
-	if (!current)
-	    lsap->changed = true;
-	else {
-	    lsap->changed = changed;
-	    lsap->rollover = current->rollover;
-	    lsap->min_failed = min_failed;
-	    if (current->lsa_rxmt != 0)
-		lsap->changed |= current->changed;
-	    lsap->update_in_place(current);
-	    UnParseLSA(current);
-	}
-	lsap->start_aging();
+		// If database copy, unparse it
+		if (!current)
+			lsap->changed = true;
+		else {
+			lsap->changed = changed;
+			lsap->rollover = current->rollover;
+			lsap->min_failed = min_failed;
+			if (current->lsa_rxmt != 0)
+				lsap->changed |= current->changed;
+			lsap->update_in_place(current);
+			UnParseLSA(current);
+		}
+		lsap->start_aging();
     }
     
     // Parse the new body contents
@@ -258,10 +257,10 @@ LSA *OSPF::AddLSA(SpfIfc *ip,SpfArea *ap,LSA *current,LShdr *hdr,bool changed)
         upload_opq(lsap);
     // If changes, schedule new routing calculations
     if (changed) {
-	rtsched(lsap, old_rte);
-	cancel_help_sessions(lsap);
-	if (in_hitless_restart())
-	    htl_check_consistency(ap, hdr);
+		rtsched(lsap, old_rte);
+		cancel_help_sessions(lsap);
+		if (in_hitless_restart())
+			htl_check_consistency(ap, hdr);
     }
 
     return(lsap);
@@ -401,32 +400,32 @@ void OSPF::ParseLSA(LSA *lsap, LShdr *hdr)
     int blen;
 
     if (lsap->parsed)
-	return;
+		return;
 
     blen = ntoh16(hdr->ls_length) - sizeof(LShdr);
 
     if (lsap->lsa_age() != MaxAge) {
         bool o_dna = donotage();
-	bool o_a_dna = (lsap->lsa_ap ? lsap->lsa_ap->donotage() : false);
-	lsap->exception = false;
-	lsap->parsed = true;
-	lsap->parse(hdr);
-	lsap->process_donotage(true);
-	total_lsas++;
-	if (o_dna != donotage())
-	    dna_change = true;
-	if (lsap->lsa_ap && o_a_dna != lsap->lsa_ap->donotage())
-	    lsap->lsa_ap->dna_change = true;
+		bool o_a_dna = (lsap->lsa_ap ? lsap->lsa_ap->donotage() : false);
+		lsap->exception = false;
+		lsap->parsed = true;
+		lsap->parse(hdr);
+		lsap->process_donotage(true);
+		total_lsas++;
+		if (o_dna != donotage())
+			dna_change = true;
+		if (lsap->lsa_ap && o_a_dna != lsap->lsa_ap->donotage())
+			lsap->lsa_ap->dna_change = true;
     }
     else
-	lsap->exception = true;
+		lsap->exception = true;
 
     delete [] lsap->lsa_body;
     lsap->lsa_body = 0;
 
     if (lsap->exception) {
-	lsap->lsa_body = new byte[blen];
-	memcpy(lsap->lsa_body, (hdr + 1), blen);
+		lsap->lsa_body = new byte[blen];
+		memcpy(lsap->lsa_body, (hdr + 1), blen);
     }
 }
 
@@ -471,16 +470,16 @@ void OSPF::UnParseLSA(LSA *lsap)
 {
     if (lsap->parsed) {
         bool o_dna = donotage();
-	bool o_a_dna = (lsap->lsa_ap ? lsap->lsa_ap->donotage() : false);
-	lsap->parsed = false;
-	lsap->process_donotage(false);
-	// Type-specific unparse
-	lsap->unparse();
-	total_lsas--;
-	if (o_dna != donotage())
-	    dna_change = true;
-	if (lsap->lsa_ap && o_a_dna != lsap->lsa_ap->donotage())
-	    lsap->lsa_ap->dna_change = true;
+		bool o_a_dna = (lsap->lsa_ap ? lsap->lsa_ap->donotage() : false);
+		lsap->parsed = false;
+		lsap->process_donotage(false);
+		// Type-specific unparse
+		lsap->unparse();
+		total_lsas--;
+		if (o_dna != donotage())
+			dna_change = true;
+		if (lsap->lsa_ap && o_a_dna != lsap->lsa_ap->donotage())
+			lsap->lsa_ap->dna_change = true;
     }
 }
 
@@ -521,16 +520,16 @@ void OSPF::update_lsdb_xsum(LSA *lsap, bool add)
     scope = flooding_scope(lsap->ls_type());
 
     if (scope == LocalScope)
-	db_xsum = &lsap->lsa_ifp->db_xsum;
+		db_xsum = &lsap->lsa_ifp->db_xsum;
     else if (scope == AreaScope)
-	db_xsum = &lsap->lsa_ap->db_xsum;
+		db_xsum = &lsap->lsa_ap->db_xsum;
     else
-	db_xsum = &ase_xsum;
+		db_xsum = &ase_xsum;
 
     if (add)
-	(*db_xsum) += lsap->lsa_xsum;
+		(*db_xsum) += lsap->lsa_xsum;
     else
-	(*db_xsum) -= lsap->lsa_xsum;
+		(*db_xsum) -= lsap->lsa_xsum;
 }
 
 /* Get the next LSA from the link-state database. Organized

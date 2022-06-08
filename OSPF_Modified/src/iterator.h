@@ -54,16 +54,16 @@ inline IfcIterator::IfcIterator(SpfArea *ap)
 inline void IfcIterator::reset()
 {
     if (area)
-	next = area->a_ifcs;
+	    next = area->a_ifcs;
     else
-	next = inst->ifcs;
+	    next = inst->ifcs;
 }
 inline SpfIfc *IfcIterator::get_next()
 {
     SpfIfc *retval;
     retval = next;
     if (next)
-	next = (area ? next->anext : next->next);
+	    next = (area ? next->anext : next->next);
     return(retval);
 }
 
@@ -95,7 +95,7 @@ inline SpfNbr *NbrIterator::get_next()
     SpfNbr *retval;
     retval = next;
     if (next)
-	next = next->next;
+	    next = next->next;
     return(retval);
 }
 

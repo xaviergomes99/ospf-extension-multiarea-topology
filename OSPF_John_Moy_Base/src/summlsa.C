@@ -404,24 +404,24 @@ void RTE::run_transit_areas(rteLSA *lsap)
 {
     // Go through list of summary-LSAs
     for (; lsap; lsap = lsap->link) {
-	RTRrte *rtr;
-	uns32 new_cost;
-	if (!lsap->area()->is_transit())
-	    continue;
-	if (lsap->adv_rtr() == ospf->my_id())
-	    continue;
-	// Check that router is reachable
-	rtr = (RTRrte *) lsap->source;
-	if (!rtr || rtr->type() != RT_SPF)
-	    continue;
-	new_cost = lsap->adv_cost + rtr->cost;
-	if (cost < new_cost)
-	    continue;
-	else if (new_cost < cost)
-	    r_mpath = 0;
-	// Update routing table if better
-	// Install as current best cost
-	r_mpath = MPath::merge(r_mpath, rtr->r_mpath);
-	cost = new_cost;
+        RTRrte *rtr;
+        uns32 new_cost;
+        if (!lsap->area()->is_transit())
+            continue;
+        if (lsap->adv_rtr() == ospf->my_id())
+            continue;
+        // Check that router is reachable
+        rtr = (RTRrte *) lsap->source;
+        if (!rtr || rtr->type() != RT_SPF)
+            continue;
+        new_cost = lsap->adv_cost + rtr->cost;
+        if (cost < new_cost)
+            continue;
+        else if (new_cost < cost)
+            r_mpath = 0;
+        // Update routing table if better
+        // Install as current best cost
+        r_mpath = MPath::merge(r_mpath, rtr->r_mpath);
+        cost = new_cost;
     }
 }

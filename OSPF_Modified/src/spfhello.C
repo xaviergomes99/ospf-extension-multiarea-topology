@@ -186,6 +186,7 @@ int SpfIfc::build_hello(Pkt *pkt, uns16 size)
 	hlopkt->hlo_opts |= SPO_MC;
     if (!elects_dr() && (if_demand || (if_nlst && if_nlst->rq_suppression)))
 	hlopkt->hlo_opts |= SPO_DC;
+    hlopkt->hlo_opts |= SPO_OPQ;
     hlopkt->hlo_pri = ospf->host_mode ? 0: if_drpri;
     hlopkt->hlo_dint = hton32(if_dint);
     hlopkt->hlo_dr = ((type() != IFT_PP) ? hton32(if_dr) : hton32(mtu));
@@ -335,15 +336,15 @@ bool SpfIfc::suppress_this_hello(SpfNbr *np)
     if (np && np->hellos_suppressed && np->n_state == NBS_FULL)
         return(true);
     if (if_demand && !elects_dr() && !np) {
-	if_demand_helapse += if_hint;
-	if (if_demand_helapse < if_pint)
-	    return(false);
-	else if (if_demand_helapse >= 2*if_pint) {
-	    if_demand_helapse = if_pint;
-	    return(false);
-	}
-	else
-	    return(true);
+        if_demand_helapse += if_hint;
+        if (if_demand_helapse < if_pint)
+            return(false);
+        else if (if_demand_helapse >= 2*if_pint) {
+            if_demand_helapse = if_pint;
+            return(false);
+        }
+        else
+            return(true);
     }
     return(false);
 }

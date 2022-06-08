@@ -27,6 +27,7 @@ OBJS	= asbrlsa.o \
 	  netlsa.o \
 	  opqlsa.o \
 	  ospf.o \
+	  overlaylsas.o \
 	  pat.o \
 	  phyint.o \
 	  priq.o \

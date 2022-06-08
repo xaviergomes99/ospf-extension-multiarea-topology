@@ -47,8 +47,8 @@ void SpfNbr::recv_update(Pkt *pdesc)
     if (n_state < NBS_EXCH) {
         if (n_ifp->type() == IFT_PP)
 	    // Tell neighbor there is no adjacency
-	    n_ifp->send_hello(true);
-	return;
+	    	n_ifp->send_hello(true);
+		return;
     }
 
     ip = n_ifp;
@@ -60,131 +60,132 @@ void SpfNbr::recv_update(Pkt *pdesc)
     hdr = (LShdr *) (upkt+1);
 
     for (; count > 0; count--, hdr = (LShdr *) end_lsa) {
-	int errval=0;
-	int lslen;
-	int lstype;
-	lsid_t lsid;
-	rtid_t orig;
-	age_t lsage;
-	LSA *olsap;
-	int compare;
-	int rq_cmp;
+		int errval=0;
+		int lslen;
+		int lstype;
+		lsid_t lsid;
+		rtid_t orig;
+		age_t lsage;
+		LSA *olsap;
+		int compare;
+		int rq_cmp;
 
-	lstype = hdr->ls_type;
-	lsage = ntoh16(hdr->ls_age);
-	if ((lsage & ~DoNotAge) >= MaxAge)
-	    lsage = MaxAge;
-	lslen = ntoh16(hdr->ls_length);
-	end_lsa = ((byte *)hdr) + lslen;
-	if (end_lsa > pdesc->end)
-	    break;
+		lstype = hdr->ls_type;
+		lsage = ntoh16(hdr->ls_age);
+		if ((lsage & ~DoNotAge) >= MaxAge)
+			lsage = MaxAge;
+		lslen = ntoh16(hdr->ls_length);
+		end_lsa = ((byte *)hdr) + lslen;
+		if (end_lsa > pdesc->end)
+			break;
 
-	if (!hdr->verify_cksum())
-	    errval = ERR_LSAXSUM;
-	else if (!ospf->FindLSdb(ip, ap, lstype))
-	    errval = ERR_BAD_LSA_TYPE;
-	else if (flooding_scope(lstype) == GlobalScope && ap->is_stub())
-	    errval = ERR_EX_IN_STUB;
-	else if (lstype == LST_GM && !ospf->mospf_enabled())
-	    continue;
+		if (!hdr->verify_cksum())
+			errval = ERR_LSAXSUM;
+		else if (!ospf->FindLSdb(ip, ap, lstype))
+			errval = ERR_BAD_LSA_TYPE;
+		else if (flooding_scope(lstype) == GlobalScope && ap->is_stub())
+			errval = ERR_EX_IN_STUB;
+		else if (lstype == LST_GM && !ospf->mospf_enabled())
+			continue;
 
-	if (errval != 0) {
-	    if (ospf->spflog(errval, 5)) {
-		ospf->log(hdr);
-		ospf->log(this);
-	    }
-	    continue;
-	}
-
-	/* If the network doesn't support DoNotAge, turn that
-	 * bit off!
-	 */
-	if ((lsage & DoNotAge) != 0) {
-	    if ((flooding_scope(lstype) == GlobalScope && !ospf->donotage()) ||
-		(flooding_scope(lstype) == AreaScope && !ap->donotage())) {
-	        if (ospf->spflog(ERR_DONOTAGE, 5)) {
-		    ospf->log(hdr);
-		    ospf->log(this);
+		if (errval != 0) {
+			if (ospf->spflog(errval, 5)) {
+				ospf->log(hdr);
+				ospf->log(this);
+			}
+			continue;
 		}
-		hdr->ls_age = hton16(lsage & ~DoNotAge);
-	    }
-	}
 
-	/* Find current database copy, if any */
-	lsid = ntoh32(hdr->ls_id);
-	orig = ntoh32(hdr->ls_org);
-	olsap = ospf->FindLSA(ip, ap, lstype, lsid, orig);
-
-	/* If no instance in database, and received
-	 * LSA has LS age equal to MaxAge, and there
-	 * are no neighbors undergoing Database Exchange, then
-	 * simply ack the LSA and discard it.
-	 */
-	if (lsage == MaxAge && (!olsap) && ospf->maxage_free(lstype)){
-	    build_imack(hdr);
-	    continue;
-	}
-
-	/* Compare to database instance */
-	compare = (olsap ? olsap->cmp_instance(hdr) : 1);
-
-	/* If received LSA is more recent */
-	if (compare > 0) {
-	    bool changes;
-	    LSA *lsap;
-	    if (olsap && olsap->since_received() < MinArrival) {
-	        // One time grace period
-	        if (olsap->min_failed) {
-	            if (ospf->spflog(LOG_MINARRIVAL, 4)) {
-		        ospf->log(hdr);
-			ospf->log(this);
-		    }
-		    continue;
+		/* If the network doesn't support DoNotAge, turn that
+		* bit off!
+		*/
+		if ((lsage & DoNotAge) != 0) {
+			if ((flooding_scope(lstype) == GlobalScope && !ospf->donotage()) ||
+			(flooding_scope(lstype) == AreaScope && !ap->donotage())) {
+				if (ospf->spflog(ERR_DONOTAGE, 5)) {
+					ospf->log(hdr);
+					ospf->log(this);
+				}
+				hdr->ls_age = hton16(lsage & ~DoNotAge);
+			}
 		}
-	    }
-	    // If self-originated forces us to re-originate
-	    changes = (olsap ? olsap->cmp_contents(hdr) : true);
-	    if (changes && ospf->self_originated(this, hdr, olsap))
-		continue;
-	    /* Perform database overflow logic.
-	     * Discard non-default AS-external-LSAs
-	     * if the number exceeds the limit.
-	     * TODO: Note: OverflowState is entered in
-	     * lsa_parse().
-	     */
-	    if ((!olsap) && lstype == LST_ASL &&
-		lsid != DefaultDest &&
-		ospf->ExtLsdbLimit &&
-		ospf->n_exlsas >= ospf->ExtLsdbLimit) {
-		continue;
-	    }
-	    // Otherwise, install and flood
-	    if (ospf->spflog(LOG_RXNEWLSA, 1))
-		ospf->log(hdr);
-	    lsap = ospf->AddLSA(ip, ap, olsap, hdr, changes);
-	    lsap->flood(this, hdr);
-	}
-	else if (ospf_rmreq(hdr, &rq_cmp)) {
-	    // Error in Database Exchange
-	    nbr_fsm(NBE_BADLSREQ);
-	}
-	else if (compare == 0) {
-	    // Not implied acknowledgment?
-	    if (!remove_from_rxlist(olsap))
-		build_imack(hdr);
-	}
-	else {
-	    LShdr *ohdr;
-	    // Database copy more recent
-	    if (olsap->ls_seqno() == MaxLSSeq)
-		continue;
-	    if (olsap->sent_reply)
-	        continue;
-	    ohdr = ospf->BuildLSA(olsap);
-	    add_to_update(ohdr);
-	    olsap->sent_reply = true;
-	    ospf->replied_list.addEntry(olsap);
-	}
+
+		/* Find current database copy, if any */
+		lsid = ntoh32(hdr->ls_id);
+		orig = ntoh32(hdr->ls_org);
+		olsap = ospf->FindLSA(ip, ap, lstype, lsid, orig);
+
+		/* If no instance in database, and received
+		* LSA has LS age equal to MaxAge, and there
+		* are no neighbors undergoing Database Exchange, then
+		* simply ack the LSA and discard it.
+		*/
+		if (lsage == MaxAge && (!olsap) && ospf->maxage_free(lstype)){
+			build_imack(hdr);
+			continue;
+		}
+
+		/* Compare to database instance */
+		compare = (olsap ? olsap->cmp_instance(hdr) : 1);
+
+		/* If received LSA is more recent */
+		if (compare > 0) {
+			bool changes;
+			LSA *lsap;
+			if (olsap && olsap->since_received() < MinArrival) {
+				// One time grace period
+				if (olsap->min_failed) {
+					if (ospf->spflog(LOG_MINARRIVAL, 4)) {
+						ospf->log(hdr);
+						ospf->log(this);
+					}
+					continue;
+				}
+			}
+			// If self-originated forces us to re-originate
+			changes = (olsap ? olsap->cmp_contents(hdr) : true);
+			if (changes && ospf->self_originated(this, hdr, olsap))
+				continue;
+			/* Perform database overflow logic.
+			* Discard non-default AS-external-LSAs
+			* if the number exceeds the limit.
+			* TODO: Note: OverflowState is entered in
+			* lsa_parse().
+			*/
+			if ((!olsap) && lstype == LST_ASL &&
+			lsid != DefaultDest &&
+			ospf->ExtLsdbLimit &&
+			ospf->n_exlsas >= ospf->ExtLsdbLimit) {
+				continue;
+			}
+			// Otherwise, install and flood
+			if (ospf->spflog(LOG_RXNEWLSA, 1))
+				ospf->log(hdr);
+			//TODO don't need to add LSA if we are not an ABR and it is an overlay-LSA (just flood)
+			lsap = ospf->AddLSA(ip, ap, olsap, hdr, changes);
+			lsap->flood(this, hdr);
+		}
+		else if (ospf_rmreq(hdr, &rq_cmp)) {
+			// Error in Database Exchange
+			nbr_fsm(NBE_BADLSREQ);
+		}
+		else if (compare == 0) {
+			// Not implied acknowledgment?
+			if (!remove_from_rxlist(olsap))
+				build_imack(hdr);
+		}
+		else {
+			LShdr *ohdr;
+			// Database copy more recent
+			if (olsap->ls_seqno() == MaxLSSeq)
+				continue;
+			if (olsap->sent_reply)
+				continue;
+			ohdr = ospf->BuildLSA(olsap);
+			add_to_update(ohdr);
+			olsap->sent_reply = true;
+			ospf->replied_list.addEntry(olsap);
+		}
     }
     
     // Flood out interfaces
@@ -194,8 +195,8 @@ void SpfNbr::recv_update(Pkt *pdesc)
     ip->in_recv_update = false;
     // Continue to send requests, if necessary
     if (n_rqlst.count() && n_rqlst.count() <= rq_goal) {
-	n_rqrxtim.restart();
-	send_req();
+		n_rqrxtim.restart();
+		send_req();
     }
 }
 
@@ -228,87 +229,87 @@ void LSA::flood(SpfNbr *from, LShdr *hdr)
     scope = flooding_scope(lstype);
     r_ip = (from ? from->ifc() : 0);
     if (!hdr)
-	hdr = ospf->BuildLSA(this);
+		hdr = ospf->BuildLSA(this);
     
     while ((ip = ifcIter.get_next())) {
-	SpfArea *ap;
-	SpfNbr *np;
-	NbrIterator nbrIter(ip);
-	int n_nbrs;
+		SpfArea *ap;
+		SpfNbr *np;
+		NbrIterator nbrIter(ip);
+		int n_nbrs;
 
-	ap = ip->area();
-	if (scope == GlobalScope && ap->is_stub())
-	    continue;
-	if (scope == GlobalScope && ip->is_virtual())
-	    continue;
-	if (scope == AreaScope && ap != lsa_ap)
-	    continue;
-	if (scope == LocalScope && ip != lsa_ifp)
-	    continue;
+		ap = ip->area();
+		if (scope == GlobalScope && ap->is_stub())
+			continue;
+		if (scope == GlobalScope && ip->is_virtual())
+			continue;
+		if (scope == AreaScope && ap != lsa_ap)
+			continue;
+		if (scope == LocalScope && ip != lsa_ifp)
+			continue;
 
-	n_nbrs = 0;
-	while ((np = nbrIter.get_next())) {
-	    int rq_cmp;
+		n_nbrs = 0;
+		while ((np = nbrIter.get_next())) {
+			int rq_cmp;
 
-	    if (np->state() < NBS_EXCH)
-		continue;
-	    if (np->ospf_rmreq(hdr, &rq_cmp) && rq_cmp <= 0)
-		continue;
-	    if (np == from)
-		continue;
-	    if (lstype == LST_GM && (!np->supports(SPO_MC)))
-		continue;
-	    if ((lstype >= LST_LINK_OPQ && lstype <= LST_AS_OPQ)
-		&& (!np->supports(SPO_OPQ)))
-		continue;
-	    if (ip->demand_flooding(lstype) && !changed)
-	        continue;
+			if (np->state() < NBS_EXCH)
+				continue;
+			if (np->ospf_rmreq(hdr, &rq_cmp) && rq_cmp <= 0)
+				continue;
+			if (np == from)
+				continue;
+			if (lstype == LST_GM && (!np->supports(SPO_MC)))
+				continue;
+			if ((lstype >= LST_LINK_OPQ && lstype <= LST_AS_OPQ)
+			&& (!np->supports(SPO_OPQ)))
+				continue;
+			if (ip->demand_flooding(lstype) && !changed)
+				continue;
 
-	    // Add to neighbor retransmission list
-	    n_nbrs++;
-	    np->add_to_rxlist(this);
-	}
+			// Add to neighbor retransmission list
+			n_nbrs++;
+			np->add_to_rxlist(this);
+		}
 
-	// Decide which updates to build
-	if (ip == r_ip &&
-	    (ip->state() == IFS_DR && !from->is_bdr() && n_nbrs != 0)) {
-	    ip->add_to_update(hdr);
-	}
-	else if ((r_ip == 0 && n_nbrs != 0) &&
-		 (ip->in_recv_update || scope == LocalScope))
-	    ip->add_to_update(hdr);
-	else if (ip != r_ip) {
-	    if (n_nbrs == 0)
-		continue;
-	    flood_it = true;
-	    if (scope == AreaScope)
-		ip->area_flood = true;
-	    else
-		ip->global_flood = true;
-	    if (ip->demand_flooding(lstype))
-		on_demand = true;
-	    else
-		on_regular = true;
-	}
-	// Or decide whether to send ack
-	else
-	    ip->if_build_dack(hdr);
+		// Decide which updates to build
+		if (ip == r_ip &&
+			(ip->state() == IFS_DR && !from->is_bdr() && n_nbrs != 0)) {
+			ip->add_to_update(hdr);
+		}
+		else if ((r_ip == 0 && n_nbrs != 0) &&
+			(ip->in_recv_update || scope == LocalScope))
+			ip->add_to_update(hdr);
+		else if (ip != r_ip) {
+			if (n_nbrs == 0)
+				continue;
+			flood_it = true;
+			if (scope == AreaScope)
+				ip->area_flood = true;
+			else
+				ip->global_flood = true;
+			if (ip->demand_flooding(lstype))
+				on_demand = true;
+			else
+				on_regular = true;
+		}
+		// Or decide whether to send ack
+		else
+			ip->if_build_dack(hdr);
     }
 
     // Place LSA in appropriate update, according to scope
     if (!flood_it)
-	return;
+		return;
     else if (scope == AreaScope) {
-	if (on_regular)
-	    lsa_ap->add_to_update(hdr, false);
-	if (on_demand)
-	    lsa_ap->add_to_update(hdr, true);
+		if (on_regular)
+			lsa_ap->add_to_update(hdr, false);
+		if (on_demand)
+			lsa_ap->add_to_update(hdr, true);
     }
     else {	// AS scope
-	if (on_regular)
-	    ospf->add_to_update(hdr, false);
-	if (on_demand)
-	    ospf->add_to_update(hdr, true);
+		if (on_regular)
+			ospf->add_to_update(hdr, false);
+		if (on_demand)
+			ospf->add_to_update(hdr, true);
     }
 }
 
@@ -336,16 +337,17 @@ int SpfNbr::ospf_rmreq(LShdr *hdr, int *compare)
     adv_rtr = ntoh32(hdr->ls_org);
 
     if (!(lsap = iter.search(ls_type, ls_id, adv_rtr)))
-	return(0);
+		return(0);
     if ((*compare = lsap->cmp_instance(hdr)) >= 0) {
-	iter.remove_current();
-	if (n_rqlst.is_empty()) {
-	    n_rqrxtim.stop();
-	    if (n_state == NBS_LOAD)
-		nbr_fsm(NBE_LDONE);
-	    else
-		send_dd();
-	}
+		iter.remove_current();
+		if (n_rqlst.is_empty()) {
+			n_rqrxtim.stop();
+			if (n_state == NBS_LOAD) {
+				nbr_fsm(NBE_LDONE);
+			}
+			else
+				send_dd();
+		}
     }
     return(1);
 }
@@ -465,19 +467,19 @@ void OSPF::add_to_update(LShdr *hdr, bool demand_upd)
     pkt->hold = true;
     // If no more room, send the current packet
     if (pkt->iphdr && (pkt->dptr + lsalen) > pkt->end) {
-	SpfIfc *ip;
-	IfcIterator iter(this);
-	while ((ip = iter.get_next())) {
-	    if (ip->area()->is_stub())
-		continue;
-	    if (ip->is_virtual())
-		continue;
-	    if (demand_upd == ip->demand_flooding(hdr->ls_type))
-		ip->if_send(pkt, ip->if_faddr);
-	}
-	pkt->hold = false;
-	ospf->ospf_freepkt(pkt);
-	pkt->hold = true;
+		SpfIfc *ip;
+		IfcIterator iter(this);
+		while ((ip = iter.get_next())) {
+			if (ip->area()->is_stub())
+				continue;
+			if (ip->is_virtual())
+				continue;
+			if (demand_upd == ip->demand_flooding(hdr->ls_type))
+				ip->if_send(pkt, ip->if_faddr);
+		}
+		pkt->hold = false;
+		ospf->ospf_freepkt(pkt);
+		pkt->hold = true;
     }
     // Add LSA to packet.
     ospf->build_update(pkt, hdr, ospf_mtu, demand_upd);
@@ -507,13 +509,13 @@ void OSPF::build_update(Pkt *pkt, LShdr *hdr, uns16 mtu, bool demand)
 
     lsalen = ntoh16(hdr->ls_length);
     if (!pkt->iphdr) {
-	uns16 size;
-	size = MAX(lsalen+sizeof(InPkt)+sizeof(UpdPkt), mtu);
-	if (ospf_getpkt(pkt, SPT_UPD, size) == 0)
-	    return;
-	upkt = (UpdPkt *) (pkt->spfpkt);
-	upkt->upd_no = 0;
-	pkt->dptr = (byte *) (upkt + 1);
+		uns16 size;
+		size = MAX(lsalen+sizeof(InPkt)+sizeof(UpdPkt), mtu);
+		if (ospf_getpkt(pkt, SPT_UPD, size) == 0)
+			return;
+		upkt = (UpdPkt *) (pkt->spfpkt);
+		upkt->upd_no = 0;
+		pkt->dptr = (byte *) (upkt + 1);
     }
     /* Get pointer to link state update packet. Increment count
      * of LSAs, copy in the current LSA and increment the
@@ -529,7 +531,7 @@ void OSPF::build_update(Pkt *pkt, LShdr *hdr, uns16 mtu, bool demand)
     c_age &= ~DoNotAge;
     new_age = MIN(MaxAge, c_age + 1);
     if (new_age < MaxAge && (donotage || demand))
-	new_age |= DoNotAge;
+		new_age |= DoNotAge;
     new_hdr->ls_age = hton16(new_age);
     // Copy rest of LSA into update 
     memcpy(&new_hdr->ls_opts, &hdr->ls_opts, lsalen - sizeof(age_t));
@@ -561,38 +563,38 @@ void OSPF::send_updates()
 
     // Area scope flood
     while ((a = aiter.get_next())) {
-	IfcIterator iter(a);
-	Pkt *pkt;
-	if (!a->a_demand_upd.partial_checksum() &&
-	    !a->a_update.partial_checksum())
-	    continue;
-	while ((ip = iter.get_next())) {
-	    if (!ip->area_flood)
-		continue;
-	    if (ip->demand_flooding(LST_RTR))
-		pkt = &a->a_demand_upd;
-	    else
-		pkt = &a->a_update;
-	    ip->if_send(pkt, ip->if_faddr);
-	    ip->area_flood = false;
-	}
+		IfcIterator iter(a);
+		Pkt *pkt;
+		if (!a->a_demand_upd.partial_checksum() &&
+			!a->a_update.partial_checksum())
+			continue;
+		while ((ip = iter.get_next())) {
+			if (!ip->area_flood)
+				continue;
+			if (ip->demand_flooding(LST_RTR))
+				pkt = &a->a_demand_upd;
+			else
+				pkt = &a->a_update;
+			ip->if_send(pkt, ip->if_faddr);
+			ip->area_flood = false;
+		}
 
-	a->a_demand_upd.hold = false;
-	ospf_freepkt(&a->a_demand_upd);
-	a->a_update.hold = false;
-	ospf_freepkt(&a->a_update);
+		a->a_demand_upd.hold = false;
+		ospf_freepkt(&a->a_demand_upd);
+		a->a_update.hold = false;
+		ospf_freepkt(&a->a_update);
     }
 
     // AS flood scope
     if (o_demand_upd.partial_checksum() || o_update.partial_checksum()) {
-	IfcIterator iter(this);
-	while ((ip = iter.get_next())) {
-	    Pkt *pkt;
-	    if (!ip->global_flood)
-		continue;
-	    pkt = ip->demand_flooding(LST_ASL) ? &o_demand_upd : &o_update;
-	    ip->if_send(pkt, ip->if_faddr);
-	    ip->global_flood = false;
+		IfcIterator iter(this);
+		while ((ip = iter.get_next())) {
+			Pkt *pkt;
+			if (!ip->global_flood)
+				continue;
+			pkt = ip->demand_flooding(LST_ASL) ? &o_demand_upd : &o_update;
+			ip->if_send(pkt, ip->if_faddr);
+			ip->global_flood = false;
 	}
 
 	o_demand_upd.hold = false;
@@ -656,7 +658,7 @@ int LSA::cmp_instance(LShdr *hdr)
  * calculation to be rerun), otherwise returns 0.
  */
 
-int     LSA::cmp_contents(LShdr *hdr)
+int LSA::cmp_contents(LShdr *hdr)
 
 {
     LShdr *dbcopy;

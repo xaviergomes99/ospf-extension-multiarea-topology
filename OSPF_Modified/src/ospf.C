@@ -122,6 +122,11 @@ OSPF::OSPF(uns32 rtid, SPFtime grace) : myid(rtid)
     n_helping = 0;
 
     n_dijkstras = 0;
+    n_overlay_dijkstras = 0;
+
+    //Multi-area extension variables init
+    abr_changed = false;
+    myABRlsa = 0;
 
     // Initialize logging
     logno = 0;
@@ -192,6 +197,10 @@ OSPF::~OSPF()
     extLSAs.clear();
     ASBRtree.clear();
     dna_flushq.clear();
+    ABRNbrs.clear();
+    abrLSAs.clear();
+    prefixLSAs.clear();
+    asbrLSAs.clear();
     delete [] build_area;
     delete [] orig_buff;
     delete [] mon_buff;
@@ -389,58 +398,59 @@ void OSPF::rxpkt(int phyint, InPkt *pkt, int plen)
     spfpkt = pdesc.spfpkt;
 
     if (ntoh32(spfpkt->srcid) == myid)
-	return;
+	    return;
 
     if (plen < ntoh16(pkt->i_len))
-	rcv_err = RCV_SHORT;
+	    rcv_err = RCV_SHORT;
     else if (pdesc.bsize < (int) sizeof(SpfPkt))
-	rcv_err = RCV_SHORT;
+	    rcv_err = RCV_SHORT;
     else if (pdesc.bsize < ntoh16(spfpkt->plen))
-	rcv_err = RCV_SHORT;
+	    rcv_err = RCV_SHORT;
     else if (spfpkt->vers != OSPFv2)
-	rcv_err = RCV_BADV;
+	    rcv_err = RCV_BADV;
     else if (!(ip = find_ifc(&pdesc)))
-	rcv_err = RCV_NO_IFC;
+	    rcv_err = RCV_NO_IFC;
     else {
-	np = ip->find_nbr(ntoh32(pkt->i_src), ntoh32(spfpkt->srcid));
-	if (spfpkt->ptype != SPT_HELLO && !np)
-	    rcv_err = RCV_NO_NBR;
-	else if (!ip->verify(&pdesc, np)) {
-	    rcv_err = RCV_AUTH;
-	    err_level = 5;
-	}
-	else if (ntoh32(pkt->i_dest) == AllDRouters &&
-		 ip->state() <= IFS_OTHER)
-	    rcv_err = RCV_NOTDR;
+        np = ip->find_nbr(ntoh32(pkt->i_src), ntoh32(spfpkt->srcid));
+        if (spfpkt->ptype != SPT_HELLO && !np)
+            rcv_err = RCV_NO_NBR;
+        else if (!ip->verify(&pdesc, np)) {
+            rcv_err = RCV_AUTH;
+            err_level = 5;
+        }
+        else if (ntoh32(pkt->i_dest) == AllDRouters &&
+            ip->state() <= IFS_OTHER)
+            rcv_err = RCV_NOTDR;
     }
 
     if (rcv_err) {
-	if (spflog(rcv_err, err_level))
-	    log(&pdesc);
-	return;
+        if (spflog(rcv_err, err_level))
+            log(&pdesc);
+        return;
     }
 
     if (spflog(LOG_RCVPKT, 1))
-	log(&pdesc);
+	    log(&pdesc);
+    
     // Dispatch on OSPF packet type
     switch (spfpkt->ptype) {
-      case SPT_HELLO:	// Hello packet
-	ip->recv_hello(&pdesc);
-	break;
-      case SPT_DD:		// Database Description
-	np->recv_dd(&pdesc);
-	break;
-      case SPT_LSREQ:	// Link State Request
-	np->recv_req(&pdesc);
-	break;
-      case SPT_UPD:		// Link State Update
-	np->recv_update(&pdesc);
-	break;
-      case SPT_LSACK:	// Link State Acknowledgment
-	np->recv_ack(&pdesc);
-	break;
-      default:		// Bad packet type
-	break;
+        case SPT_HELLO:	// Hello packet
+            ip->recv_hello(&pdesc);
+            break;
+        case SPT_DD:		// Database Description
+            np->recv_dd(&pdesc);
+            break;
+        case SPT_LSREQ:	// Link State Request
+            np->recv_req(&pdesc);
+            break;
+        case SPT_UPD:		// Link State Update
+            np->recv_update(&pdesc);
+            break;
+        case SPT_LSACK:	// Link State Acknowledgment
+            np->recv_ack(&pdesc);
+            break;
+        default:		// Bad packet type
+            break;
     }
 }
 

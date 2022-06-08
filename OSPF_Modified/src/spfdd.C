@@ -61,79 +61,78 @@ void SpfNbr::recv_dd(Pkt *pdesc)
 
     if (ntoh16(ddpkt->dd_mtu) > n_ifp->mtu) {
         if (ospf->spflog(LOG_BADMTU, 5)) {
-	    ospf->log(this);
-	    ospf->log("mtu ");
-	    ospf->log(ntoh16(ddpkt->dd_mtu));
-	}
+			ospf->log(this);
+			ospf->log("mtu ");
+			ospf->log(ntoh16(ddpkt->dd_mtu));
+		}
     }
 
     switch (n_state) {
+		case NBS_DOWN:
+		case NBS_ATTEMPT:
+		default:
+			return;
 
-      case NBS_DOWN:
-      case NBS_ATTEMPT:
-      default:
-	return;
-	
-      case NBS_INIT:
-      case NBS_2WAY:
-	nbr_fsm(NBE_DDRCVD);
-	if (n_state != NBS_EXST)
-	    return;
-	// Fall through to state NBS_EXST
-	
-      case NBS_EXST:
-	if (claim != master)
-	    return;
-	if (master && (!init) && (seqno == n_ddseq)) {
-	    n_opts = new_opts;
-	    nbr_fsm(NBE_NEGDONE);
-	    break;
-	}
-	if ((!master) && init && more && is_empty) {
-	    n_opts = new_opts;
-	    nbr_fsm(NBE_NEGDONE);
-	    break;
-	}
-	return;
+		case NBS_INIT:
+		case NBS_2WAY:
+			nbr_fsm(NBE_DDRCVD);
+			if (n_state != NBS_EXST)
+				return;
+		// Fall through to state NBS_EXST
 
-      case NBS_EXCH:
-	if (claim != master || init || n_opts != new_opts) {
-	    nbr_fsm(NBE_DDSEQNO);
-	    return;
-	}
-	else if (master) {
-	    if (seqno == n_ddseq)
-		break;
-	    if (master && seqno == (n_ddseq - 1))
-		return;
-	}
-	else { // slave processing
-	    if (seqno == (n_ddseq + 1))
-		break;
-	    if (seqno == n_ddseq) {
-		rxmt_dd();
-		return;
-	    }
-	}
-	
-	nbr_fsm(NBE_DDSEQNO);
-	return;
-	
-      case NBS_LOAD:
-      case NBS_FULL:
-	if (claim != master || init || n_opts != new_opts) {
-	    nbr_fsm(NBE_DDSEQNO);
-	    return;
-	}
-	else if (master && seqno == (n_ddseq - 1))
-	    return;
-	else if ((!master) && seqno == n_ddseq) {
-	    rxmt_dd();
-	    return;
-	}
+		case NBS_EXST:
+			if (claim != master)
+				return;
+			if (master && (!init) && (seqno == n_ddseq)) {
+				n_opts = new_opts;
+				nbr_fsm(NBE_NEGDONE);
+				break;
+			}
+			if ((!master) && init && more && is_empty) {
+				n_opts = new_opts;
+				nbr_fsm(NBE_NEGDONE);
+				break;
+			}
+			return;
 
-	nbr_fsm(NBE_DDSEQNO);
-	return;
+		case NBS_EXCH:
+			if (claim != master || init || n_opts != new_opts) {
+				nbr_fsm(NBE_DDSEQNO);
+				return;
+			}
+			else if (master) {
+				if (seqno == n_ddseq)
+					break;
+				if (master && seqno == (n_ddseq - 1))
+					return;
+			}
+			else { // slave processing
+				if (seqno == (n_ddseq + 1))
+					break;
+				if (seqno == n_ddseq) {
+					rxmt_dd();
+					return;
+				}
+			}
+
+			nbr_fsm(NBE_DDSEQNO);
+			return;
+
+		case NBS_LOAD:
+		case NBS_FULL:
+			if (claim != master || init || n_opts != new_opts) {
+				nbr_fsm(NBE_DDSEQNO);
+				return;
+			}
+			else if (master && seqno == (n_ddseq - 1))
+				return;
+			else if ((!master) && seqno == n_ddseq) {
+				rxmt_dd();
+				return;
+			}
+
+			nbr_fsm(NBE_DDSEQNO);
+			return;
     }
 
     // Valid DD packet received, and next in sequence
@@ -151,20 +150,20 @@ void SpfNbr::recv_dd(Pkt *pdesc)
     // If Master, increment sequence number and
     // check for sequence completion
     if (master) {
-	n_ddseq++;
-	if (database_sent && (!more)) {
-	    nbr_fsm(NBE_EXCHDONE);
-	    return;
-	}
+		n_ddseq++;
+		if (database_sent && (!more)) {
+			nbr_fsm(NBE_EXCHDONE);
+			return;
+		}
     }
     // Slave. Copy sequence number.
     else
-	n_ddseq = seqno;
+		n_ddseq = seqno;
 
     // If no outstanding requests, send next DD packet
     // Slave may then transition
     if (n_rqlst.is_empty())
-	send_dd();
+		send_dd();
 }
 
 
@@ -182,25 +181,25 @@ void SpfNbr::process_dd_contents(LShdr *hdr, byte *end)
     ip = n_ifp;
     ap = ip->area();
     for (; (byte *) hdr < end; hdr++) {
-	int lstype;
-	lsid_t lsid;
-	rtid_t orig;
-	LSA *lsap;
+		int lstype;
+		lsid_t lsid;
+		rtid_t orig;
+		LSA *lsap;
 
-	lstype = hdr->ls_type;
-	lsid = ntoh32(hdr->ls_id);
-	orig = ntoh32(hdr->ls_org);
-	lsap = ospf->FindLSA(ip, ap, lstype, lsid, orig);
+		lstype = hdr->ls_type;
+		lsid = ntoh32(hdr->ls_id);
+		orig = ntoh32(hdr->ls_org);
+		lsap = ospf->FindLSA(ip, ap, lstype, lsid, orig);
 
-	if (lsap && lsap->cmp_instance(hdr) <= 0)
-	    continue;
+		if (lsap && lsap->cmp_instance(hdr) <= 0)
+			continue;
 
-	// Add to link state request list
-	// If first entry, start link state request timer
-	if (n_rqlst.is_empty())
-	    n_rqrxtim.start(ip->if_rxmt*Timer::SECOND, false);
-	lsap = new LSA(0, 0, hdr, 0);
-	n_rqlst.addEntry(lsap);
+		// Add to link state request list
+		// If first entry, start link state request timer
+		if (n_rqlst.is_empty())
+			n_rqrxtim.start(ip->if_rxmt*Timer::SECOND, false);
+		lsap = new LSA(0, 0, hdr, 0);
+		n_rqlst.addEntry(lsap);
     }
 }
 
@@ -225,31 +224,31 @@ void SpfNbr::send_dd()
     ap = ip->area();
 
     if (ospf->ospf_getpkt(&n_ddpkt, SPT_DD, ip->mtu) == 0)
-	return;
+		return;
 
     ddpkt = (DDPkt *) (n_ddpkt.spfpkt);
     ddpkt->dd_mtu = ip->is_virtual() ? 0 : hton16(ip->mtu);
     ddpkt->dd_seqno = hton32(n_ddseq);
     ddpkt->dd_opts = SPO_OPQ;
     if (!ap->is_stub())
-	ddpkt->dd_opts |= SPO_EXT;
+		ddpkt->dd_opts |= SPO_EXT;
     if (ospf->mospf_enabled())
-	ddpkt->dd_opts |= SPO_MC;
+		ddpkt->dd_opts |= SPO_MC;
     if (!ip->elects_dr() && (ip->if_demand || rq_suppression))
-	ddpkt->dd_opts |= SPO_DC;
+		ddpkt->dd_opts |= SPO_DC;
 
     n_ddpkt.dptr = (byte *) (ddpkt + 1);
     if (n_state == NBS_EXST) {
-	n_ddpkt.hold = true;
-	ddpkt->dd_imms = DD_INIT | DD_MORE | DD_MASTER;
-	database_sent = false;
-	ip->nbr_send(&n_ddpkt, this);
-	n_ddrxtim.start(ip->if_rxmt*Timer::SECOND, false);
-	return;
+		n_ddpkt.hold = true;
+		ddpkt->dd_imms = DD_INIT | DD_MORE | DD_MASTER;
+		database_sent = false;
+		ip->nbr_send(&n_ddpkt, this);
+		n_ddrxtim.start(ip->if_rxmt*Timer::SECOND, false);
+		return;
     }
 
     if (master)
-	n_ddrxtim.start(ip->if_rxmt*Timer::SECOND, false);
+		n_ddrxtim.start(ip->if_rxmt*Timer::SECOND, false);
 
     n_progtim.restart();
     n_ddpkt.hold = true;
@@ -257,30 +256,30 @@ void SpfNbr::send_dd()
     // Fill in packet from the "Database summary list"
     while ((lsap = iter.get_next())) {
         hdr = (LShdr *) n_ddpkt.dptr;
-	if (!lsap->valid()) {
-	    iter.remove_current();
-	    continue;
-	}
-	else if (lsap->lsa_age() == MaxAge) {
-	    iter.remove_current();
-	    add_to_rxlist(lsap);
-	    hdr = ospf->BuildLSA(lsap);
-	    (void) add_to_update(hdr);
-	    continue;
-	}
-	else if (n_ddpkt.dptr + sizeof(LShdr) > n_ddpkt.end)
-	    break;
-	else {
-	    iter.remove_current();
-	    *hdr = *lsap;
-	    n_ddpkt.dptr += sizeof(LShdr);
-	}
+		if (!lsap->valid()) {
+			iter.remove_current();
+			continue;
+		}
+		else if (lsap->lsa_age() == MaxAge) {
+			iter.remove_current();
+			add_to_rxlist(lsap);
+			hdr = ospf->BuildLSA(lsap);
+			(void) add_to_update(hdr);
+			continue;
+		}
+		else if (n_ddpkt.dptr + sizeof(LShdr) > n_ddpkt.end)
+			break;
+		else {
+			iter.remove_current();
+			*hdr = *lsap;
+			n_ddpkt.dptr += sizeof(LShdr);
+		}
     }
 
     if (master)
-	ddpkt->dd_imms |= DD_MASTER;
+		ddpkt->dd_imms |= DD_MASTER;
     if (!n_ddlst.is_empty())
-	ddpkt->dd_imms |= DD_MORE;
+		ddpkt->dd_imms |= DD_MORE;
     else
         database_sent = true;
 
@@ -289,8 +288,8 @@ void SpfNbr::send_dd()
 
     // If slave, can transition if last in sequence
     if ((!master) && database_sent && (n_imms & DD_MORE) == 0) {
-	nbr_fsm(NBE_EXCHDONE);
-	n_holdtim.start(ip->if_dint*Timer::SECOND);
+		nbr_fsm(NBE_EXCHDONE);
+		n_holdtim.start(ip->if_dint*Timer::SECOND);
     }
 }
 
@@ -306,12 +305,12 @@ void SpfNbr::rxmt_dd()
 
 {
     if (n_ddpkt.iphdr) {
-	if (ospf->spflog(LOG_RXMTDD, 4))
-	    ospf->log(this);
-	n_ifp->nbr_send(&n_ddpkt, this);
+		if (ospf->spflog(LOG_RXMTDD, 4))
+			ospf->log(this);
+		n_ifp->nbr_send(&n_ddpkt, this);
     }
     else if (n_state == NBS_FULL)
-	nbr_fsm(NBE_DDSEQNO);
+		nbr_fsm(NBE_DDSEQNO);
 }
 
 /* Retransmsion timer has fired, telling us that it's time to

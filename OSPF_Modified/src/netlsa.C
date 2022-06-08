@@ -48,16 +48,16 @@ void SpfIfc::nl_orig(int forced)
     hdr = nl_raw_orig();
 
     if (hdr == 0)
-	lsa_flush(olsap);
+	    lsa_flush(olsap);
     else {
         seq_t seqno;
-	seqno = ospf->ospf_get_seqno(LST_NET, olsap, forced);
-	if (seqno != InvalidLSSeq) {
-	    // Fill in rest of LSA contents
-	    hdr->ls_seqno = hton32(seqno);
-	    (void) ospf->lsa_reorig(0, if_area, olsap, hdr, forced);
-	}
-	ospf->free_orig_buffer(hdr);
+	    seqno = ospf->ospf_get_seqno(LST_NET, olsap, forced);
+        if (seqno != InvalidLSSeq) {
+            // Fill in rest of LSA contents
+            hdr->ls_seqno = hton32(seqno);
+            (void) ospf->lsa_reorig(0, if_area, olsap, hdr, forced);
+        }
+	    ospf->free_orig_buffer(hdr);
     }
 }
 
@@ -81,9 +81,9 @@ LShdr *SpfIfc::nl_raw_orig()
     SpfNbr *np;
 
     if (if_state != IFS_DR)
-	return(0);
+	    return(0);
     else if (if_nfull == 0)
-	return(0);
+	    return(0);
 
     // Build new LSA
     length = sizeof(NetLShdr) + (if_nfull+1)*sizeof(rtid_t);
@@ -106,8 +106,8 @@ LShdr *SpfIfc::nl_raw_orig()
     nbr_ids = (rtid_t *) (nethdr + 1);
     *nbr_ids = hton32(ospf->my_id());
     while ((np = iter.get_next()) != 0) {
-	if (np->adv_as_full())
-	    *(++nbr_ids) = hton32(np->id());
+        if (np->adv_as_full())
+            *(++nbr_ids) = hton32(np->id());
     }
     return(hdr);
 }
@@ -133,9 +133,9 @@ void netLSA::reoriginate(int forced)
 
     if ((ip = ospf->find_ifc(ls_id())) == 0 ||
 	ip->area() != lsa_ap)
-	lsa_flush(this);
+	    lsa_flush(this);
     else
-	ip->nl_orig(forced);
+	    ip->nl_orig(forced);
 }
 
 /* Parse a network-LSA. Calculate a routing table entry for the net/mask
@@ -162,7 +162,7 @@ void netLSA::parse(LShdr *hdr)
     net = ls_id() & mask;
 
     if (!(t_dest = inrttbl->add(net, mask)))
-	exception = true;
+	    exception = true;
 
     tlpp = (TLink **) &t_links;
 
@@ -172,39 +172,39 @@ void netLSA::parse(LShdr *hdr)
     len -= sizeof(NetLShdr);
     idp = (rtid_t *) (nethdr + 1);
     for (; len >= (int) sizeof(rtid_t); tlpp = (TLink **)&tlp->l_next) {
-	rtid_t rtid;
-	rtid = ntoh32(*idp);
-	// Allocate link. if necessary
-	if (!(tlp = *tlpp)) {
-	    tlp = new TLink;
-	    // Link into list
-	    *tlpp = tlp;
-	}
-	// Fill in transit link parameters
-	tlp->tl_nbr = 0;
-	tlp->l_ltype = LT_PP;	// Router on other end
-	tlp->l_id = rtid;
-	tlp->l_fwdcst = 0;
-	tlp->tl_rvcst = MAX_COST;
-	// Link into database
-	tlp_link(tlp);
-	// Progress to next link
-	len -= sizeof(rtid_t);
+        rtid_t rtid;
+        rtid = ntoh32(*idp);
+        // Allocate link. if necessary
+        if (!(tlp = *tlpp)) {
+            tlp = new TLink;
+            // Link into list
+            *tlpp = tlp;
+        }
+        // Fill in transit link parameters
+        tlp->tl_nbr = 0;
+        tlp->l_ltype = LT_PP;	// Router on other end
+        tlp->l_id = rtid;
+        tlp->l_fwdcst = 0;
+        tlp->tl_rvcst = MAX_COST;
+        // Link into database
+        tlp_link(tlp);
+        // Progress to next link
+        len -= sizeof(rtid_t);
 
-	idp++;
+        idp++;
     }
 
     // Have to save LShdr?
     if (len != 0)
-	exception = true;
+	    exception = true;
 
     // Clean up unused transit links
     lp = *tlpp;
     // Zero terminate list
     *tlpp = 0;
     for (; lp; lp = nextl) {
-	nextl = lp->l_next;
-	delete lp;
+        nextl = lp->l_next;
+        delete lp;
     }
 }
 

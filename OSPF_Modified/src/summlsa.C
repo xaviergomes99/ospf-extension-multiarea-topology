@@ -125,6 +125,7 @@ void SpfArea::sl_orig(INrte *rte, int forced)
 uns32 SpfArea::sl_cost(INrte *rte)
 
 {
+    // TODO summary LSA restrictions
     aid_t home;
     uns32 cost;
 
@@ -190,21 +191,21 @@ summLSA *SpfArea::sl_reorig(summLSA *olsap, lsid_t lsid, uns32 cost,
     length = sizeof(LShdr) + sizeof(SummHdr);
     // Originate, reoriginate or flush the LSA
     if (cost == LSInfinity) {
-	lsa_flush(olsap);
-	return(0);
+        lsa_flush(olsap);
+        return(0);
     }
     else if ((seqno = ospf->ospf_get_seqno(LST_SUMM, olsap, forced))
 	     == InvalidLSSeq)
-	return(0);
+	    return(0);
 
     // Fill in LSA contents
     // Header
     hdr = ospf->orig_buffer(length);
     hdr->ls_opts = SPO_DC;
     if (!a_stub)
-	hdr->ls_opts |= SPO_EXT;
+	    hdr->ls_opts |= SPO_EXT;
     if (ospf->mc_abr())
-	hdr->ls_opts |= SPO_MC;
+	    hdr->ls_opts |= SPO_MC;
     hdr->ls_type = LST_SUMM;
     hdr->ls_id = hton32(lsid);
     hdr->ls_org = hton32(ospf->my_id());
@@ -260,13 +261,13 @@ void summLSA::parse(LShdr *hdr)
     mask = ntoh32(summ->mask);
     netno = ls_id() & mask;
     if (!(rte = inrttbl->add(netno, mask))) {
-	exception = true;
-	return;
+	    exception = true;
+	    return;
     }
     if ((ntoh32(summ->metric) & ~LSInfinity) != 0)
-	exception = true;
+	    exception = true;
     else if (lsa_length != sizeof(LShdr) + sizeof(SummHdr))
-	exception = true;
+	    exception = true;
     adv_cost = ntoh32(summ->metric) & LSInfinity;
 
     link = rte->summs;
@@ -321,10 +322,10 @@ void INrte::run_inter_area()
     byte new_type;
 
     if (r_type == RT_SPF || r_type == RT_DIRECT)
-	return;
+	    return;
     // Saved state checked later in OSPF::rt_scan()
     if (r_type == RT_SPFIA)
-	save_state();
+	    save_state();
 
     new_type = RT_NONE;
     best_path = 0;
@@ -332,51 +333,51 @@ void INrte::run_inter_area()
     summ_ap = ospf->SummaryArea();
     // Go through list of summary-LSAs
     for (lsap = summs; lsap; lsap = (summLSA *)lsap->link) {
-	RTRrte *rtr;
-	uns32 new_cost;
-	if (lsap->area() != summ_ap)
-	    continue;
-	// Install reject route if self advertising
-	if (lsap->adv_rtr() == ospf->my_id()) {
-	    new_type = RT_REJECT;
-	    cost = LSInfinity;
-	    best_path = 0;
-	    break;
-	}
-	// Check that router is reachable
-	rtr = (RTRrte *) lsap->source;
-	if (!rtr || rtr->type() != RT_SPF)
-	    continue;
-	// And that a reachable cost is being advertised
-	if (lsap->adv_cost == LSInfinity)
-	    continue;
-	// Compare cost to current best
-	new_cost = lsap->adv_cost + rtr->cost;
-	if (new_type != RT_NONE ) {
-	    if (cost < new_cost)
-		continue;
-	    if (new_cost < cost)
-		best_path = 0;
-	}
-	// Install as current best cost
-	cost = new_cost;
-	new_type = RT_SPFIA;
-	best_path = MPath::merge(best_path, rtr->r_mpath);
+        RTRrte *rtr;
+        uns32 new_cost;
+        if (lsap->area() != summ_ap)
+            continue;
+        // Install reject route if self advertising
+        if (lsap->adv_rtr() == ospf->my_id()) {
+            new_type = RT_REJECT;
+            cost = LSInfinity;
+            best_path = 0;
+            break;
+        }
+        // Check that router is reachable
+        rtr = (RTRrte *) lsap->source;
+        if (!rtr || rtr->type() != RT_SPF)
+            continue;
+        // And that a reachable cost is being advertised
+        if (lsap->adv_cost == LSInfinity)
+            continue;
+        // Compare cost to current best
+        new_cost = lsap->adv_cost + rtr->cost;
+        if (new_type != RT_NONE ) {
+            if (cost < new_cost)
+                continue;
+            if (new_cost < cost)
+                best_path = 0;
+        }
+        // Install as current best cost
+        cost = new_cost;
+        new_type = RT_SPFIA;
+        best_path = MPath::merge(best_path, rtr->r_mpath);
     }
 
     // Delete old inter-area route?
     if (new_type == RT_NONE &&
 	(r_type == RT_SPFIA || r_type == RT_REJECT)) {
-	declare_unreachable();
-	changed = true;
-	return;
+        declare_unreachable();
+        changed = true;
+        return;
     }
     else if (new_type == RT_NONE)
-	return;
+	    return;
     else if (r_type != new_type)
-	changed = true;
+	    changed = true;
     else if (summ_ap->id() != area())
-	changed = true;
+	    changed = true;
 
     // Install inter-area route
     // Maybe be overriden by "resolving virtual next hops"
@@ -404,24 +405,24 @@ void RTE::run_transit_areas(rteLSA *lsap)
 {
     // Go through list of summary-LSAs
     for (; lsap; lsap = lsap->link) {
-	RTRrte *rtr;
-	uns32 new_cost;
-	if (!lsap->area()->is_transit())
-	    continue;
-	if (lsap->adv_rtr() == ospf->my_id())
-	    continue;
-	// Check that router is reachable
-	rtr = (RTRrte *) lsap->source;
-	if (!rtr || rtr->type() != RT_SPF)
-	    continue;
-	new_cost = lsap->adv_cost + rtr->cost;
-	if (cost < new_cost)
-	    continue;
-	else if (new_cost < cost)
-	    r_mpath = 0;
-	// Update routing table if better
-	// Install as current best cost
-	r_mpath = MPath::merge(r_mpath, rtr->r_mpath);
-	cost = new_cost;
+        RTRrte *rtr;
+        uns32 new_cost;
+        if (!lsap->area()->is_transit())
+            continue;
+        if (lsap->adv_rtr() == ospf->my_id())
+            continue;
+        // Check that router is reachable
+        rtr = (RTRrte *) lsap->source;
+        if (!rtr || rtr->type() != RT_SPF)
+            continue;
+        new_cost = lsap->adv_cost + rtr->cost;
+        if (cost < new_cost)
+            continue;
+        else if (new_cost < cost)
+            r_mpath = 0;
+        // Update routing table if better
+        // Install as current best cost
+        r_mpath = MPath::merge(r_mpath, rtr->r_mpath);
+        cost = new_cost;
     }
 }

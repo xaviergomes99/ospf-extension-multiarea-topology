@@ -33,6 +33,7 @@ rtrLSA::rtrLSA(SpfArea *a, LShdr *hdr, int blen) : TNode(a, hdr, blen)
 
 {
     rtype = 0;
+	abr = 0;
 }
 
 /* Maximum number of bytes added to a router-LSA by a
@@ -54,14 +55,14 @@ RtrLink *VLIfc::rl_insert(RTRhdr *rtrhdr, RtrLink *rlp)
     SpfNbr *np;
 
     if ((np = if_nlst) && np->adv_as_full()) {
-	rlp->link_id = hton32(np->id());
-	rlp->link_data = hton32(if_addr);
-	rlp->link_type = LT_VL;
-	rlp->n_tos = 0;
-	rlp->metric = hton16(if_cost);
-	if_area->add_to_ifmap(this);
-	rlp++;
-	rtrhdr->nlinks++;
+		rlp->link_id = hton32(np->id());
+		rlp->link_data = hton32(if_addr);
+		rlp->link_type = LT_VL;
+		rlp->n_tos = 0;
+		rlp->metric = hton16(if_cost);
+		if_area->add_to_ifmap(this);
+		rlp++;
+		rtrhdr->nlinks++;
     }
     return(rlp);
 }
@@ -76,26 +77,26 @@ RtrLink *DRIfc::rl_insert(RTRhdr *rtrhdr, RtrLink *rlp)
 
 {
     if ((if_state == IFS_DR && if_nfull > 0) ||
-	((if_state == IFS_BACKUP || if_state == IFS_OTHER) &&
-	 (if_dr_p && if_dr_p->adv_as_full()))) {
-	rlp->link_id = hton32(if_dr);
-	rlp->link_data = hton32(if_addr);
-	rlp->link_type = LT_TNET;
-	rlp->n_tos = 0;
-	rlp->metric = hton16(if_cost);
-	if_area->add_to_ifmap(this);
-	rlp++;
-	rtrhdr->nlinks++;
+		((if_state == IFS_BACKUP || if_state == IFS_OTHER) &&
+		(if_dr_p && if_dr_p->adv_as_full()))) {
+		rlp->link_id = hton32(if_dr);
+		rlp->link_data = hton32(if_addr);
+		rlp->link_type = LT_TNET;
+		rlp->n_tos = 0;
+		rlp->metric = hton16(if_cost);
+		if_area->add_to_ifmap(this);
+		rlp++;
+		rtrhdr->nlinks++;
     }
     else {
-	rlp->link_id = hton32(if_net);
-	rlp->link_data = hton32(if_mask);
-	rlp->link_type = LT_STUB;
-	rlp->n_tos = 0;
-	rlp->metric = hton16(if_cost);
-	if_area->add_to_ifmap(this);
-	rlp++;
-	rtrhdr->nlinks++;
+		rlp->link_id = hton32(if_net);
+		rlp->link_data = hton32(if_mask);
+		rlp->link_type = LT_STUB;
+		rlp->n_tos = 0;
+		rlp->metric = hton16(if_cost);
+		if_area->add_to_ifmap(this);
+		rlp++;
+		rtrhdr->nlinks++;
     }
     return(rlp);
 }
@@ -120,23 +121,23 @@ RtrLink *PPIfc::rl_insert(RTRhdr *rtrhdr, RtrLink *rlp)
     SpfNbr *np;
 
     if ((np = if_nlst) && np->adv_as_full()) {
-	PPAdjAggr *adjaggr;
-	uns16 adv_cost;
-	adv_cost = if_cost;
-	adjaggr = (PPAdjAggr *)if_area->AdjAggr.find(np->id(), 0);
-	if (adjaggr && adjaggr->first_full) {
-	    if (adjaggr->first_full != this)
-	        goto adv_stub;
-	    adv_cost = adjaggr->nbr_cost;
-	}
-	rlp->link_id = hton32(np->id());
-	rlp->link_data = hton32(unnumbered() ? if_IfIndex : if_addr);
-	rlp->link_type = LT_PP;
-	rlp->n_tos = 0;
-	rlp->metric = hton16(adv_cost);
-	if_area->add_to_ifmap(this);
-	rlp++;
-	rtrhdr->nlinks++;
+		PPAdjAggr *adjaggr;
+		uns16 adv_cost;
+		adv_cost = if_cost;
+		adjaggr = (PPAdjAggr *)if_area->AdjAggr.find(np->id(), 0);
+		if (adjaggr && adjaggr->first_full) {
+			if (adjaggr->first_full != this)
+				goto adv_stub;
+			adv_cost = adjaggr->nbr_cost;
+		}
+		rlp->link_id = hton32(np->id());
+		rlp->link_data = hton32(unnumbered() ? if_IfIndex : if_addr);
+		rlp->link_type = LT_PP;
+		rlp->n_tos = 0;
+		rlp->metric = hton16(adv_cost);
+		if_area->add_to_ifmap(this);
+		rlp++;
+		rtrhdr->nlinks++;
     }
 
   adv_stub: // Advertise stub link to neighbor's IP address
@@ -144,19 +145,19 @@ RtrLink *PPIfc::rl_insert(RTRhdr *rtrhdr, RtrLink *rlp)
     if (state() == IFS_PP && !unnumbered() &&
 	(np || (if_mask != 0xffffffffL && if_mask != 0))) {
         if (if_mask != 0xffffffffL && if_mask != 0) {
-	    rlp->link_id = hton32(if_net);
-	    rlp->link_data = hton32(if_mask);
-	}
-	else {
-	    rlp->link_id = hton32(np->addr());
-	    rlp->link_data = hton32(0xffffffffL);
-	}
-	rlp->link_type = LT_STUB;
-	rlp->n_tos = 0;
-	rlp->metric = hton16(if_cost);
-	if_area->add_to_ifmap(this);
-	rlp++;
-	rtrhdr->nlinks++;
+			rlp->link_id = hton32(if_net);
+			rlp->link_data = hton32(if_mask);
+		}
+		else {
+			rlp->link_id = hton32(np->addr());
+			rlp->link_data = hton32(0xffffffffL);
+		}
+		rlp->link_type = LT_STUB;
+		rlp->n_tos = 0;
+		rlp->metric = hton16(if_cost);
+		if_area->add_to_ifmap(this);
+		rlp++;
+		rtrhdr->nlinks++;
     }
     return(rlp);
 }
@@ -290,6 +291,7 @@ void SpfArea::rl_orig(int forced)
 	hdr->ls_opts |= SPO_EXT;
     if (ospf->mospf_enabled())
 	hdr->ls_opts |= SPO_MC;
+	hdr->ls_opts |= SPO_OPQ;
     hdr->ls_type = LST_RTR;
     hdr->ls_id = hton32(ospf->my_id());
     hdr->ls_org = hton32(ospf->my_id());
@@ -477,6 +479,7 @@ void rtrLSA::parse(LShdr *hdr)
     int i;
     Link *nextl;
     TOSmetric *mp;
+	rtid_t orig_rtr;
     
     rhdr = (RTRhdr *) (hdr+1);
     rtlp = (RtrLink *) (rhdr+1);
@@ -484,77 +487,95 @@ void rtrLSA::parse(LShdr *hdr)
     end = ((byte *) hdr) + ntoh16(hdr->ls_length);
 
     rtype = rhdr->rtype;
+	orig_rtr = ntoh32(hdr->ls_org);
+
+	// If this router is an ABR, update our stored info accordingly
+	if (ospf->n_area > 1) { // No need to enter if we are not an ABR
+		// Only create instance of ABRNbr if the router is an ABR
+		if ((rtype == RTYPE_B) && (orig_rtr != ospf->my_id())) {
+			// New neighboring ABR
+			if (abr == 0) { 
+				abr = new ABRNbr(orig_rtr, this, area());
+			}
+			// There is a link to a ABRNbr created, but it is wrong
+			else if ((abr->get_rid() != orig_rtr) || (abr->get_rtrLSA() != this)) {
+				ospf->ABRNbrs.remove(abr);
+				abr = new ABRNbr(orig_rtr, this, area());
+			}
+		}
+	}
+
     t_dest = lsa_ap->add_abr(ls_id());
     // Virtual link address calculation might change
     t_dest->changed = true;
     if (rhdr->zero != 0)
-	exception = true;
+		exception = true;
 
     lpp = &t_links;
     for (i = 0; i < n_links; i++) {
-	if (((byte *) rtlp) > end) {
-	    exception = true;
-	    break;
+		if (((byte *) rtlp) > end) {
+			exception = true;
+			break;
+		}
+		// (re)allocate link. if necessary
+		if ((!(lp = *lpp)) || lp->l_ltype != rtlp->link_type) {
+			Link *nextl;
+			nextl = lp;
+			if (rtlp->link_type == LT_STUB)
+				lp = new SLink;
+			else
+				lp = new TLink;
+			// Link into list
+			*lpp = lp;
+			lp->l_next = nextl;
+		}
+		// Fill in link parameters
+		lp->l_ltype = rtlp->link_type;
+		lp->l_id = ntoh32(rtlp->link_id);
+		lp->l_fwdcst = ntoh16(rtlp->metric);
+		lp->l_data = ntoh32(rtlp->link_data);
+		switch (rtlp->link_type) {
+			INrte *srte;
+			TLink *tlp;
+			case LT_STUB:
+				srte = inrttbl->add(lp->l_id, lp->l_data);
+				((SLink *) lp)->sl_rte = srte;
+				break;
+			case LT_PP:
+			case LT_TNET:
+			case LT_VL:
+				tlp = (TLink *) lp;
+				tlp->tl_nbr = 0;
+				tlp->tl_rvcst = MAX_COST;
+				// Link into database
+				tlp_link(tlp);
+				break;
+			default:
+				break;
+		}
+		// If TOS metrics, must keep unparsed form
+		if (rtlp->n_tos)
+			exception = true;
+		// Advance link pointer
+		lpp = &lp->l_next;
+		// Step over non-zero TOS metrics
+		mp = (TOSmetric *)(rtlp+1);
+		mp += rtlp->n_tos;
+		rtlp = (RtrLink *)mp;
 	}
-	// (re)allocate link. if necessary
-	if ((!(lp = *lpp)) || lp->l_ltype != rtlp->link_type) {
-	    Link *nextl;
-	    nextl = lp;
-	    if (rtlp->link_type == LT_STUB)
-		lp = new SLink;
-	    else
-		lp = new TLink;
-	    // Link into list
-	    *lpp = lp;
-	    lp->l_next = nextl;
-	}
-	// Fill in link parameters
-	lp->l_ltype = rtlp->link_type;
-	lp->l_id = ntoh32(rtlp->link_id);
-	lp->l_fwdcst = ntoh16(rtlp->metric);
-	lp->l_data = ntoh32(rtlp->link_data);
-	switch (rtlp->link_type) {
-	    INrte *srte;
-	    TLink *tlp;
-	  case LT_STUB:
-	    srte = inrttbl->add(lp->l_id, lp->l_data);
-	    ((SLink *) lp)->sl_rte = srte;
-	    break;
-	  case LT_PP:
-	  case LT_TNET:
-	  case LT_VL:
-	    tlp = (TLink *) lp;
-	    tlp->tl_nbr = 0;
-	    tlp->tl_rvcst = MAX_COST;
-	    // Link into database
-	    tlp_link(tlp);
-	    break;
-	  default:
-	    break;
-	}
-	// If TOS metrics, must keep unparsed form
-	if (rtlp->n_tos)
-	    exception = true;
-	// Advance link pointer
-	lpp = &lp->l_next;
-	// Step over non-zero TOS metrics
-	mp = (TOSmetric *)(rtlp+1);
-	mp += rtlp->n_tos;
-	rtlp = (RtrLink *)mp;
-    }
 
-    // Need to keep LSA, or rebuild from parsed copy?
-    if (((byte *) rtlp) != end)
-	exception = true;
+		// Need to keep LSA, or rebuild from parsed copy?
+	if (((byte *) rtlp) != end)
+		exception = true;
 
-    // Clean up unused transit links
-    lp = *lpp;
-    // Null terminate list
-    *lpp = 0;
-    for (; lp; lp = nextl) {
-	nextl = lp->l_next;
-	delete lp;
-    }
+	// Clean up unused transit links
+	lp = *lpp;
+	// Null terminate list
+	*lpp = 0;
+	for (; lp; lp = nextl) {
+		nextl = lp->l_next;
+		delete lp;
+	}
 }
 
 /* Link a transit link into the link-state database by setting
