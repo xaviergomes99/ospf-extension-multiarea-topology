@@ -33,6 +33,7 @@ rtrLSA::rtrLSA(SpfArea *a, LShdr *hdr, int blen) : TNode(a, hdr, blen)
 
 {
     rtype = 0;
+	abr = 0;
 }
 
 /* Maximum number of bytes added to a router-LSA by a
@@ -290,6 +291,7 @@ void SpfArea::rl_orig(int forced)
 	hdr->ls_opts |= SPO_EXT;
     if (ospf->mospf_enabled())
 	hdr->ls_opts |= SPO_MC;
+	hdr->ls_opts |= SPO_OPQ;
     hdr->ls_type = LST_RTR;
     hdr->ls_id = hton32(ospf->my_id());
     hdr->ls_org = hton32(ospf->my_id());
@@ -477,6 +479,7 @@ void rtrLSA::parse(LShdr *hdr)
     int i;
     Link *nextl;
     TOSmetric *mp;
+	rtid_t orig_rtr;
     
     rhdr = (RTRhdr *) (hdr+1);
     rtlp = (RtrLink *) (rhdr+1);
@@ -484,6 +487,24 @@ void rtrLSA::parse(LShdr *hdr)
     end = ((byte *) hdr) + ntoh16(hdr->ls_length);
 
     rtype = rhdr->rtype;
+	orig_rtr = ntoh32(hdr->ls_org);
+
+	// If this router is an ABR, update our stored info accordingly
+	if (ospf->n_area > 1) { // No need to enter if we are not an ABR
+		// Only create instance of ABRNbr if the router is an ABR
+		if ((rtype == RTYPE_B) && (orig_rtr != ospf->my_id())) {
+			// New neighboring ABR
+			if (abr == 0) { 
+				abr = new ABRNbr(orig_rtr, this, area());
+			}
+			// There is a link to a ABRNbr created, but it is wrong
+			else if ((abr->get_rid() != orig_rtr) || (abr->get_rtrLSA() != this)) {
+				ospf->ABRNbrs.remove(abr);
+				abr = new ABRNbr(orig_rtr, this, area());
+			}
+		}
+	}
+
     t_dest = lsa_ap->add_abr(ls_id());
     // Virtual link address calculation might change
     t_dest->changed = true;

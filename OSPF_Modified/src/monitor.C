@@ -60,7 +60,6 @@ void OSPF::global_stats(MonMsg *req, int conn_id)
     msg->body.statrsp.n_ase_import = hton32(n_extImports);
     msg->body.statrsp.extdb_limit = hton32(ExtLsdbLimit);
     msg->body.statrsp.n_dijkstra = hton32(n_dijkstras);
-    msg->body.statrsp.n_overlay_dijkstra = hton32(n_overlay_dijkstras);
     msg->body.statrsp.n_area = hton16(n_area);
     msg->body.statrsp.n_dbx_nbrs = hton16(n_dbx_nbrs);
     msg->body.statrsp.mospf = g_mospf_enabled ? 1 : 0;

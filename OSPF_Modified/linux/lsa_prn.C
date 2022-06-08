@@ -73,6 +73,7 @@ void print_lsa(LShdr *hdr)
 	void print_asex_lsa(byte *, int);
 	void print_gm_lsa(byte *, int);
 	void print_opq_lsa(byte *, int);
+    void print_opq_lsa(byte *, int, lsid_t);
       case LST_RTR:
 	print_rtr_lsa(body, len);
 	break;
@@ -94,8 +95,8 @@ void print_lsa(LShdr *hdr)
       case LST_LINK_OPQ:
       case LST_AREA_OPQ:
       case LST_AS_OPQ:
-	print_opq_lsa(body, len);
-	break;
+    print_opq_lsa(body, len, hdr->ls_id);
+    break;
       default:
 	break;
     }
@@ -306,10 +307,48 @@ void print_opq_lsa(byte *body, int len)
 
     end = body + len;
 
-    printf("\t// Opaque-LSA body\n\t");
+    printf("\t\t// Opaque-LSA body\n");
     for (i=0; i < len; i++) {
 	if (i != 0 && (i % 16) == 0)
 	    printf("\r\n\t");
 	printf("%02x ", body[i]);
     }
+    printf("\n");
+}
+
+/* Print the body of an opaque-LSA, given it's opaque-type.
+ * Used to print out the body of the newly added overlay-LSAs
+ */
+
+void print_opq_lsa(byte *body, int len, lsid_t opq_type)
+
+{
+    // ABR-LSA
+    if (opq_type == OPQ_T_MULTI_ABR) {
+        ABRhdr *abr;
+        byte *end;
+        int	i;
+        in_addr in;
+
+        abr = (ABRhdr *) body;
+        end = body + len;
+
+        printf("\t\t// ABR-LSA body\n");
+        for (i=1; (byte *) abr < end; i++, abr++) {
+            if (((byte *) (abr+1)) > end)
+                break;
+            in = *((in_addr *) &abr->neigh_rid);
+            printf("\tNeighbor #%d\n", i);
+            printf("\tNeighbor RID: %s\n", inet_ntoa(in));
+            printf("\tIntra-area cost to neighbor:\t%d\n\n", ntoh32(abr->metric));
+        }
+    }
+    else if (opq_type == OPQ_T_MULTI_PREFIX) {
+
+    }
+    else if (opq_type == OPQ_T_MULTI_ASBR) {
+
+    }
+    else
+        print_opq_lsa(body, len);
 }

@@ -23,7 +23,6 @@
 #include "ospfinc.h"
 #include "phyint.h"
 #include "ifcfsm.h"
-#include "opqlsa.h"
 
 /* Constructor for a opaque-LSA.
  */
@@ -44,7 +43,7 @@ opqLSA::opqLSA(SpfIfc *i, SpfArea *a, LShdr *hdr, int blen)
 
 void opqLSA::parse(LShdr *hdr)
 
-{
+{   
     exception = true;
     // Store for Opaque-LSA application upload, in case
     // LSA is deleted before it can be uploaded
@@ -56,12 +55,12 @@ void opqLSA::parse(LShdr *hdr)
     if (lsa_type == LST_LINK_OPQ && ls_id() == (OPQ_T_HLRST<<24))
         ospf->grace_LSA_rx(this, hdr);
     
-    if (lsa_type == LST_AS_OPQ && ls_id() == (OPQ_T_MULTI_ABR<<24))
-        //TODO parse ABR-LSA
-    if (lsa_type == LST_AS_OPQ && ls_id() == (OPQ_T_MULTI_PREFIX<<24))
-        //TODO parse Prefix-LSA
-    if (lsa_type == LST_AS_OPQ && ls_id() == (OPQ_T_MULTI_ASBR<<24))
-        //TODO parse ASBR-LSA
+    //TODO don't parse if we are not ABR?? or don't add LSA if not ABR?? (in the recv_update)
+    //both for safety??
+    if (lsa_type == LST_AS_OPQ && (ls_id() == (OPQ_T_MULTI_ABR<<24) || 
+                                   ls_id() == (OPQ_T_MULTI_PREFIX<<24) ||
+                                   ls_id() == (OPQ_T_MULTI_ASBR<<24)))
+        parse_overlay_lsa(hdr);
 }
 
 /* Unparse an opaque-LSA.
@@ -74,12 +73,11 @@ void opqLSA::unparse()
     if (lsa_type == LST_LINK_OPQ && ls_id() == (OPQ_T_HLRST<<24))
         ospf->grace_LSA_flushed(this);
 
-    if (lsa_type == LST_AS_OPQ && ls_id() == (OPQ_T_MULTI_ABR<<24))
-        //TODO unparse ABR-LSA
-    if (lsa_type == LST_AS_OPQ && ls_id() == (OPQ_T_MULTI_PREFIX<<24))
-        //TODO unparse Prefix-LSA
-    if (lsa_type == LST_AS_OPQ && ls_id() == (OPQ_T_MULTI_ASBR<<24))
-        //TODO unparse ASBR-LSA
+    if (lsa_type == LST_AS_OPQ && (ls_id() == (OPQ_T_MULTI_ABR<<24) || 
+                                   ls_id() == (OPQ_T_MULTI_PREFIX<<24) ||
+                                   ls_id() == (OPQ_T_MULTI_ASBR<<24))) {
+        unparse_overlay_lsa();
+    }
 }
 
 /* Build an opaque-LSA. Since the parse function
@@ -197,10 +195,10 @@ bool OSPF::adv_area_opq(aid_t a_id, lsid_t lsid, byte *body, int blen,bool adv)
     return(true);
 }
 
-void OSPF::adv_as_opq(lsid_t lsid, byte *body, int blen, bool adv)
+void OSPF::adv_as_opq(lsid_t lsid, byte *body, int blen, bool adv, int forced)
 
 {
-    opq_orig(0, 0, LST_AS_OPQ, lsid, body, blen, adv, 0);
+    opq_orig(0, 0, LST_AS_OPQ, lsid, body, blen, adv, forced);
 }
 
 /* Constructor for a holding queue of Opaque-LSAs, destined

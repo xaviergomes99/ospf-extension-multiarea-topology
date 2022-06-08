@@ -183,9 +183,9 @@ enum {
     OPQ_T_HLRST = 3,	// Hitless restart extensions
     
     //Extension to support multi-area arbitrary topologies 
-    OPQ_T_MULTI_ABR = 4,    //ABR-LSA
-    OPQ_T_MULTI_PREFIX = 5,    //Prefix-LSA
-    OPQ_T_MULTI_ASBR = 6,    //ASBR-LSA
+    OPQ_T_MULTI_ABR = 5,    //ABR-LSA
+    OPQ_T_MULTI_PREFIX = 6,    //Prefix-LSA
+    OPQ_T_MULTI_ASBR = 7,    //ASBR-LSA
 };
 
 struct ABRhdr { //body of ABR-LSA, per neighbor

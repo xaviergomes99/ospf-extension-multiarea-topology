@@ -125,7 +125,8 @@ OSPF::OSPF(uns32 rtid, SPFtime grace) : myid(rtid)
     n_overlay_dijkstras = 0;
 
     //Multi-area extension variables init
-    first_overlay_lsas_sent = false;
+    abr_changed = false;
+    myABRlsa = 0;
 
     // Initialize logging
     logno = 0;
@@ -196,6 +197,10 @@ OSPF::~OSPF()
     extLSAs.clear();
     ASBRtree.clear();
     dna_flushq.clear();
+    ABRNbrs.clear();
+    abrLSAs.clear();
+    prefixLSAs.clear();
+    asbrLSAs.clear();
     delete [] build_area;
     delete [] orig_buff;
     delete [] mon_buff;

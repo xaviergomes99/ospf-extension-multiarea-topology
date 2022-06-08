@@ -24,7 +24,6 @@
 
 #include "ospfinc.h"
 #include "system.h"
-#include "opqlsa.h"
 
 /* Find the AVL tree associated with this particular area
  * and LS type.

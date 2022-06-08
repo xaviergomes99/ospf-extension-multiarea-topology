@@ -161,6 +161,7 @@ void SpfNbr::recv_update(Pkt *pdesc)
 			// Otherwise, install and flood
 			if (ospf->spflog(LOG_RXNEWLSA, 1))
 				ospf->log(hdr);
+			//TODO don't need to add LSA if we are not an ABR and it is an overlay-LSA (just flood)
 			lsap = ospf->AddLSA(ip, ap, olsap, hdr, changes);
 			lsap->flood(this, hdr);
 		}
@@ -343,8 +344,6 @@ int SpfNbr::ospf_rmreq(LShdr *hdr, int *compare)
 			n_rqrxtim.stop();
 			if (n_state == NBS_LOAD) {
 				nbr_fsm(NBE_LDONE);
-				if (ospf->n_area > 1 && !ospf->first_overlay_lsas_sent)
-                	ospf->nb_max_state_achieved();
 			}
 			else
 				send_dd();

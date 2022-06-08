@@ -292,16 +292,10 @@ void SpfNbr::nba_eval1()
 {
     n_state = NBS_2WAY;
     n_ifp->adjust_hello_interval(this);
-    if (!n_ifp->adjacency_wanted(this)) {
+    if (!n_ifp->adjacency_wanted(this))
         DelPendAdj();
-        if (ospf->n_area > 1 && !ospf->first_overlay_lsas_sent)
-            ospf->nb_max_state_achieved();
-    }
-    else if (!n_ifp->more_adjacencies_needed(id())) {
+    else if (!n_ifp->more_adjacencies_needed(id()))
 	    DelPendAdj();
-        if (ospf->n_area > 1 && !ospf->first_overlay_lsas_sent)
-            ospf->nb_max_state_achieved();
-    }
     else if (ospf->n_lcl_inits < ospf->max_dds) {
 	    n_state = NBS_EXST;
         ospf->n_lcl_inits++;
@@ -321,11 +315,8 @@ void SpfNbr::nba_eval1()
 void SpfNbr::nba_eval2()
 
 {
-    if (!n_ifp->adjacency_wanted(this)) {
+    if (!n_ifp->adjacency_wanted(this))
 	    n_state = NBS_2WAY;
-        if (ospf->n_area > 1 && !ospf->first_overlay_lsas_sent)
-            ospf->nb_max_state_achieved();
-    }
     else if (ospf->n_rmt_inits < ospf->max_dds) {
         n_rmt_init = true;
         n_state = NBS_EXST;
@@ -381,12 +372,8 @@ void SpfNbr::nba_snapshot()
 void SpfNbr::nba_exchdone()
 
 {
-    if (n_rqlst.is_empty()) {
+    if (n_rqlst.is_empty())
         n_state = NBS_FULL;
-        // Check all neighbor states to send first overlay-LSAs (if ABR)
-        if (ospf->n_area > 1 && !ospf->first_overlay_lsas_sent)
-            ospf->nb_max_state_achieved();
-    }   
     else
 	    n_state = NBS_LOAD;
 }
@@ -405,8 +392,6 @@ void SpfNbr::nba_reeval()
     if (!n_ifp->adjacency_wanted(this)) {
         nba_clr_lists();
         n_state = NBS_2WAY;
-        if (ospf->n_area > 1 && !ospf->first_overlay_lsas_sent)
-            ospf->nb_max_state_achieved();
     }
 }
 

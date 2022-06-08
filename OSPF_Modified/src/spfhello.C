@@ -186,6 +186,7 @@ int SpfIfc::build_hello(Pkt *pkt, uns16 size)
 	hlopkt->hlo_opts |= SPO_MC;
     if (!elects_dr() && (if_demand || (if_nlst && if_nlst->rq_suppression)))
 	hlopkt->hlo_opts |= SPO_DC;
+    hlopkt->hlo_opts |= SPO_OPQ;
     hlopkt->hlo_pri = ospf->host_mode ? 0: if_drpri;
     hlopkt->hlo_dint = hton32(if_dint);
     hlopkt->hlo_dr = ((type() != IFT_PP) ? hton32(if_dr) : hton32(mtu));

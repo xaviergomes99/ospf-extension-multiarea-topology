@@ -42,6 +42,8 @@ public:
     virtual void unparse();
     virtual void build(LShdr *hdr);
     virtual void update_in_place(LSA *);
+    virtual void parse_overlay_lsa(LShdr *hdr);
+    virtual void unparse_overlay_lsa();
     SpfNbr *grace_lsa_parse(byte *, int, int &);
     friend class OSPF;
 };
@@ -57,27 +59,41 @@ class OpqHoldQ : public AVLitem {
     friend class OSPF;
 };
 
-class overlayAbrLSA : public opqLSA, public PriQElt {
-    RTRrte *t_dest;    // Destination routing table entry
-    byte cost;      // Intra area cost to this ABR
+class overlayAbrLSA : public PriQElt, public AVLitem {
+    opqLSA *lsa;    // Corresponding opaque-LSA
+    RTRrte *t_dest; // Destination routing table entry
     byte t_state;   // Current state of this ABR, in the dijkstra calc
+    ABRhdr *nbrs;   // Neighbors described in the LSA
+    int n_nbrs;     // Number of neighbors described
 public:
-    virtual void parse(LShdr *hdr);
-    virtual void unparse();
-}
+    overlayAbrLSA(class opqLSA *);
+    ~overlayAbrLSA();
+    friend class OSPF;
+    friend class opqLSA;
+};
 
-class overlayPrefixLSA : public opqLSA {
-    byte adv_cost;  //cost advertised by sender
+class overlayPrefixLSA : public AVLitem {
+    opqLSA *lsa;    // Corresponding opaque-LSA
+    INrte *rte;     // Associated routing table entry
+    byte adv_cost;  // Cost advertised by sender
+    Prefixhdr prefix;   // Prefix information
 public:
-    virtual void parse(LShdr *hdr);
-    virtual void unparse();
-}
+    overlayPrefixLSA(class opqLSA *, Prefixhdr p);
+    ~overlayPrefixLSA();
+    friend class OSPF;
+    friend class opqLSA;
+};
 
-class overlayAsbrLSA : public opqLSA {
-    byte adv_cost;  //cost advertised by sender
+class overlayAsbrLSA : public AVLitem {
+    opqLSA *lsa;    // Corresponding opaque-LSA
+    ASBRrte *rte;   // Associated routing table entry
+    byte adv_cost;  // Cost advertised by sender
+    ASBRhdr asbr;   // Destination ASBR information
 public:
-    virtual void parse(LShdr *hdr);
-    virtual void unparse();
-}
+    overlayAsbrLSA(class opqLSA *, ASBRhdr asbr);
+    ~overlayAsbrLSA();
+    friend class OSPF;
+    friend class opqLSA;
+};
     
     

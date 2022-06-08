@@ -23,7 +23,6 @@
 #include "ifcfsm.h"
 #include "nbrfsm.h"
 #include "phyint.h"
-#include "opqlsa.h"
 
 /* This file contains the routines implementing
  * helper mode for hitless restart.

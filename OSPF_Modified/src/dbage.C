@@ -126,6 +126,8 @@ void DBageTimer::action()
     // Run routing calculations
     if (ospf->full_sched)
 	ospf->full_calculation();
+    if (ospf->abr_changed)
+    ospf->orig_abrLSA();
     if (ospf->ase_sched)
 	ospf->do_all_ases();
     if (ospf->clear_mospf == true)

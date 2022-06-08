@@ -25,6 +25,7 @@
 
 class SpfIfc;
 class TLink;
+class ABRNbr;
 
 /*
  * Base class for the internal representation of all LSA
@@ -285,11 +286,13 @@ public:
 class rtrLSA : public TNode {
     uns16 n_links;
     byte rtype;
+    ABRNbr *abr;    // Link to corresponding ABRNbr instance
 public:
     rtrLSA(class SpfArea *, LShdr *, int blen);
     inline bool is_abr();
     inline bool is_asbr();
     inline bool has_VLs();
+    inline ABRNbr *get_ABRNbr();
     virtual void reoriginate(int forced);
     virtual void parse(LShdr *hdr);
     virtual void unparse();
@@ -297,6 +300,7 @@ public:
     virtual bool is_wild_card();
     friend class OSPF;
     friend class RTRrte;
+    friend class ABRNbr;
 };
 
 inline bool rtrLSA::is_abr()
@@ -310,6 +314,10 @@ inline bool rtrLSA::is_asbr()
 inline bool rtrLSA::has_VLs()
 {
     return((rtype & RTYPE_V) != 0);
+}
+inline ABRNbr *rtrLSA::get_ABRNbr()
+{
+    return(abr);
 }
 
 class netLSA : public TNode {

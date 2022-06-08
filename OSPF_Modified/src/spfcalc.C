@@ -191,6 +191,18 @@ void OSPF::dijkstra()
 		dest = V->t_dest;
 		dest->new_intra(V, false, 0, 0);
 
+		// If this node is an ABR, update the information on the corresponding
+		// ABRNbr structure
+		if (V->ls_type() == LST_RTR) {
+			rtrLSA *r = (rtrLSA *) V;
+			if (r->is_abr() && r->abr) {
+				if (r->abr->area == r->area() && r->abr->cost != V->t_dest->cost) {
+					r->abr->cost = V->t_dest->cost;
+					ospf->abr_changed = true;
+				}
+			}
+		}
+
 		// Set area's transit capability?
 		if (V->ls_type() == LST_RTR) {
 			rtrLSA *rtrlsa;
