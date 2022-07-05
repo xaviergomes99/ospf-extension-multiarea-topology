@@ -26,6 +26,10 @@
  * that it can be refreshed from local storage.
  */
 
+class overlayAbrLSA;
+class overlayPrefixLSA;
+class overlayAsbrLSA;
+
 class opqLSA : public LSA {
     bool adv_opq;
     byte *local_body;
@@ -36,6 +40,10 @@ class opqLSA : public LSA {
     InAddr if_addr;
     aid_t a_id;
 public:
+    overlayAbrLSA *abrLSA;  // Link to corresponding ABR-LSA
+    overlayPrefixLSA *prefixLSA; // Link to corresponding Prefix-LSA
+    overlayAsbrLSA *asbrLSA; // Link to corresponding ASBR-LSA
+    
     opqLSA(class SpfIfc *, class SpfArea *, LShdr *, int blen);
     virtual void reoriginate(int forced);
     virtual void parse(LShdr *hdr);
@@ -73,12 +81,11 @@ public:
 };
 
 class overlayPrefixLSA : public AVLitem {
-    opqLSA *lsa;    // Corresponding opaque-LSA
-    INrte *rte;     // Associated routing table entry
-    byte adv_cost;  // Cost advertised by sender
-    Prefixhdr prefix;   // Prefix information
+    opqLSA *lsa;        // Corresponding opaque-LSA
+    INrte *rte;         // Associated routing table entry
+    Prefixhdr *prefix;  // Prefix information
 public:
-    overlayPrefixLSA(class opqLSA *, Prefixhdr p);
+    overlayPrefixLSA(class opqLSA *, Prefixhdr *p);
     ~overlayPrefixLSA();
     friend class OSPF;
     friend class opqLSA;
@@ -87,10 +94,9 @@ public:
 class overlayAsbrLSA : public AVLitem {
     opqLSA *lsa;    // Corresponding opaque-LSA
     ASBRrte *rte;   // Associated routing table entry
-    byte adv_cost;  // Cost advertised by sender
-    ASBRhdr asbr;   // Destination ASBR information
+    ASBRhdr *asbr;  // Destination ASBR information
 public:
-    overlayAsbrLSA(class opqLSA *, ASBRhdr asbr);
+    overlayAsbrLSA(class opqLSA *, ASBRhdr *asbr);
     ~overlayAsbrLSA();
     friend class OSPF;
     friend class opqLSA;

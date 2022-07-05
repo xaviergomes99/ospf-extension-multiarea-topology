@@ -126,7 +126,9 @@ OSPF::OSPF(uns32 rtid, SPFtime grace) : myid(rtid)
 
     //Multi-area extension variables init
     abr_changed = false;
-    myABRlsa = 0;
+    first_abrLSA_sent = false;
+    send_all_prefixes = false;
+    asbr_seq = 0;
 
     // Initialize logging
     logno = 0;
@@ -143,6 +145,7 @@ OSPF::OSPF(uns32 rtid, SPFtime grace) : myid(rtid)
     dbtim.start(1*Timer::SECOND);
     // Add default route
     inrttbl = new INtbl;
+    inrttbl->next_id = 0;
     default_route = inrttbl->add(0, 0);
     fa_tbl = new FWDtbl;
 

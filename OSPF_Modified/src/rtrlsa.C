@@ -490,7 +490,7 @@ void rtrLSA::parse(LShdr *hdr)
 	orig_rtr = ntoh32(hdr->ls_org);
 
 	// If this router is an ABR, update our stored info accordingly
-	if (ospf->n_area > 1) { // No need to enter if we are not an ABR
+	if (ospf->n_area > 1) {
 		// Only create instance of ABRNbr if the router is an ABR
 		if ((rtype == RTYPE_B) && (orig_rtr != ospf->my_id())) {
 			// New neighboring ABR

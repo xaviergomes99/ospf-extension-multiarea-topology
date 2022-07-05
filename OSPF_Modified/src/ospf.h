@@ -171,7 +171,9 @@ class OSPF : public ConfigItem {
 
     //Multi-area extension variables
     bool abr_changed;   // Changes to our ABR-LSA contents
-    overlayAbrLSA *myABRlsa; // Our ABR-LSA
+    bool first_abrLSA_sent; // The first ABR-LSA has been advertised in the ABR overlay
+    bool send_all_prefixes; // Advertise all the current prefixes and ASBRs in the overlay
+    int asbr_seq;   // Next value for the opaque-ID to be assigned to a ASBR-LSA
     AVLtree ABRNbrs;    // List of all our neighboring ABRs
     AVLtree added_nbrs; // List of the currently added neighbors
     AVLtree abrLSAs;    // List of all ABR-LSAs
@@ -323,6 +325,9 @@ class OSPF : public ConfigItem {
 
     // Multi-area arbitrary topologies extension
     void orig_abrLSA();
+    void orig_prefixLSA(INrte *);
+    void orig_asbrLSA(ASBRrte *);
+    void advertise_all_prefixes();
     RTRrte *add_abr(uns32 rtrid);
 
     void overlay_calc();
@@ -422,6 +427,7 @@ class OSPF : public ConfigItem {
     friend class HostAddr;
     friend class Range;
     friend class INrte;
+    friend class INtbl;
     friend class FWDrte;
     friend class StaticNbr;
     friend class GroupTimeoutTimer;

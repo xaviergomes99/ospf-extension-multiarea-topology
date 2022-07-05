@@ -89,6 +89,8 @@ void OSPF::rtsched(LSA *newlsa, RTE *old_rte)
 				mospf_clear_external_source(rte);
 			}
 		//TODO include case for AS-scoped oapque-lsas (for ABRs only)
+		case LST_AS_OPQ:
+			break;
 		default:
 			break;
     }
@@ -193,12 +195,14 @@ void OSPF::dijkstra()
 
 		// If this node is an ABR, update the information on the corresponding
 		// ABRNbr structure
-		if (V->ls_type() == LST_RTR) {
-			rtrLSA *r = (rtrLSA *) V;
-			if (r->is_abr() && r->abr) {
-				if (r->abr->area == r->area() && r->abr->cost != V->t_dest->cost) {
-					r->abr->cost = V->t_dest->cost;
-					ospf->abr_changed = true;
+		if (ospf->n_area > 1) {
+			if (V->ls_type() == LST_RTR) {
+				rtrLSA *r = (rtrLSA *) V;
+				if (r->is_abr() && r->abr) {
+					if (r->abr->cost != V->t_dest->cost) {
+						r->abr->cost = V->t_dest->cost;
+						ospf->abr_changed = true;
+					}
 				}
 			}
 		}
@@ -274,7 +278,7 @@ RTE::RTE(uns32 key_a, uns32 key_b) : AVLitem(key_a, key_b)
     r_ospf = 0;
     cost = Infinity;
     t2cost = Infinity;
-	sent_overlay = false;
+	adv_overlay = false;
 }
 
 /* There is a newly discovered intra-area route to a transit
@@ -291,7 +295,7 @@ void RTE::new_intra(TNode *V, bool stub, uns16 stub_cost, int _index)
     total_cost = V->cost0 + stub_cost;
 
     if (r_type == RT_DIRECT)
-        return;
+		return;
     else if (r_type != RT_SPF)
 		changed = true;
     else if (dijk_run != (ospf->n_dijkstras & 1)) {
@@ -314,7 +318,7 @@ void RTE::new_intra(TNode *V, bool stub, uns16 stub_cost, int _index)
     cost = total_cost;
     set_origin(V);
     set_area(V->area()->id());
-    // Nodes other than the root have next hops in T_Node
+	// Nodes other than the root have next hops in T_Node
     if (V != V->area()->mylsa)
 		newnh = V->t_mpath;
     // Directly connected stubs
@@ -433,6 +437,7 @@ void RTE::declare_unreachable()
     r_ospf = 0;
     cost = LSInfinity;
     r_mpath = 0;
+	adv_overlay = false;
 }
 
 /* Declare an IP routing table entry unreachable.
@@ -451,6 +456,8 @@ void INrte::declare_unreachable()
         ospf->ase_sched = true;
     if (r_type == RT_DIRECT)
 		ospf->full_sched = true;
+	
+	//TODO remove corresponding overlay-LSA from the network (age prematurely)
 
     RTE::declare_unreachable();
 }
@@ -619,8 +626,12 @@ void OSPF::rt_scan()
 		if (rte->changed || rte->state_changed() || exiting_htl_restart) {
 			rte->changed = false;
 			rte->sys_install();
-			if (!rte->is_range())
+			if (!rte->is_range()) {
 				sl_orig(rte);
+				rte->adv_overlay = true;
+				if ((ospf->n_area > 1) && (ospf->first_abrLSA_sent) && (rte->type() == RT_SPF))
+					orig_prefixLSA(rte);
+			}
 		}
 		// Don't originate summaries of backbone routes
 		// into transit areas

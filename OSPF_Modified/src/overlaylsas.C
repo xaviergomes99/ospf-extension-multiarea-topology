@@ -14,6 +14,7 @@ overlayAbrLSA::overlayAbrLSA(opqLSA *opq)
  : PriQElt(), AVLitem(opq->adv_rtr(), 0) 
 {
     lsa = opq;
+    opq->abrLSA = this;
     ospf->abrLSAs.add(this);
 }
 
@@ -28,11 +29,12 @@ overlayAbrLSA::~overlayAbrLSA()
 /* Constructor for the Prefix-LSA
  */
 
-overlayPrefixLSA::overlayPrefixLSA(opqLSA *opq, Prefixhdr p)
- : AVLitem(opq->adv_rtr(), 0)
-//TODO define prefix diferentiator, for AVLtree (maybe full Prefixhdr struct in bytes????)
+overlayPrefixLSA::overlayPrefixLSA(opqLSA *opq, Prefixhdr *p)
+ : AVLitem(opq->adv_rtr(), (p->subnet_addr & p->subnet_mask)) 
+
 {
     lsa = opq;
+    opq->prefixLSA = this;
     prefix = p;
     ospf->prefixLSAs.add(this);
 }
@@ -48,11 +50,12 @@ overlayPrefixLSA::~overlayPrefixLSA()
 /* Constructor for the ASBR-LSA
  */
 
-overlayAsbrLSA::overlayAsbrLSA(opqLSA *opq, ASBRhdr a)
- : AVLitem(opq->adv_rtr(), 0)
-//TODO define ASBR diferentiator, for AVLtree (maybe full ASBRhdr struct in bytes????)
+overlayAsbrLSA::overlayAsbrLSA(opqLSA *opq, ASBRhdr *a)
+ : AVLitem(opq->adv_rtr(), a->dest_rid)
+
 {
     lsa = opq;
+    opq->asbrLSA = this;
     asbr = a;
     ospf->asbrLSAs.add(this);
 }
@@ -130,8 +133,7 @@ RTRrte *OSPF::add_abr(uns32 rtrid)
 
 void OSPF::orig_abrLSA() {
     ABRNbr *abrNbr, *abr;
-    ABRhdr *body;
-    byte *body_start;
+    ABRhdr *body, curr, body_start;
     int blen;
     lsid_t lsid;
     uns32 cost;
@@ -140,7 +142,7 @@ void OSPF::orig_abrLSA() {
     abr_changed = false;
     added_nbrs.clear();
     lsid = OPQ_T_MULTI_ABR << 24;
-    body = (ABRhdr *) body_start;
+    body = &body_start;
 
     // Iterate through all ABR neighbor entries
     abrNbr = (ABRNbr *) ABRNbrs.sllhead;
@@ -167,14 +169,78 @@ void OSPF::orig_abrLSA() {
     // Add only the lower cost entries
     abrNbr = (ABRNbr *) added_nbrs.sllhead;
     for (; abrNbr; abrNbr = (ABRNbr *) abrNbr->sll) {
-        body->metric = hton32(abrNbr->cost);
-        body->neigh_rid = hton32(abrNbr->rid);
+        curr.metric = abrNbr->cost;
+        curr.neigh_rid = hton32(abrNbr->rid);
+        memcpy(body, &curr, sizeof(ABRhdr));
         body++;
     }
 
     blen = added_nbrs.size() * sizeof(ABRhdr);
-    if (blen > 0)
-        opq_orig(0, 0, LST_AS_OPQ, lsid, body_start, blen, true, 1);
+    if (blen > 0) {
+        opq_orig(0, 0, LST_AS_OPQ, lsid, (byte *) &body_start, blen, true, 1);
+        if (!first_abrLSA_sent) {
+            first_abrLSA_sent = true;
+            send_all_prefixes = true;
+        }
+    }
+}
+
+/* For a given routing table entry (referring to an intra-area destination)
+ * we originate a Prefix-LSA and advertise it as an Opaque-LSA.
+ */
+
+void OSPF::orig_prefixLSA(INrte *rte) {
+    Prefixhdr body;
+    lsid_t lsid;
+
+    lsid = (OPQ_T_MULTI_PREFIX << 24) | ((rte->uid << 8) >> 8);
+
+    body.metric = rte->cost;
+    body.subnet_addr = hton32(rte->net());
+    body.subnet_mask = hton32(rte->mask());
+
+    opq_orig(0, 0, LST_AS_OPQ, lsid, (byte *) &body, sizeof(Prefixhdr), true, 1);
+}
+
+/* For a given ASBR (reachable through an area we are attached to)
+ * we originate an ASBR-LSA and advertise it as an Opaque-LSA.
+ */
+
+void OSPF::orig_asbrLSA(ASBRrte *rte) {
+    ASBRhdr body;
+    lsid_t lsid;
+
+    lsid = (OPQ_T_MULTI_ASBR << 24) | ((rte->uid << 8) >> 8);
+
+    body.metric = rte->cost;
+    body.dest_rid = hton32(rte->rtrid());
+
+    opq_orig(0, 0, LST_AS_OPQ, lsid, (byte *) &body, sizeof(ASBRhdr), true, 1);
+}
+
+/* We advertise all the current intra-area routes to prefixes and ASBRs
+ * into the ABR overlay. We do that by (re)originating every Prefix-LSA and
+ * ASBR-LSA available.
+ */
+
+void OSPF::advertise_all_prefixes() {
+    INrte *rte;
+    INiterator iter(inrttbl);
+    ASBRrte *asbr;
+
+    // We advertise our intra-area prefixes
+    while ((rte = iter.nextrte())) {
+        if ((rte->adv_overlay) && (rte->type() == RT_SPF))
+            orig_prefixLSA(rte);
+    }
+
+    // We also advertise all routes to intra-area reachable ASBRs
+    for (asbr = ASBRs; asbr; asbr = asbr->next()) {
+        if ((asbr->adv_overlay) && (asbr->type() == RT_SPF))
+            orig_asbrLSA(asbr);
+    }
+
+    ospf->send_all_prefixes = false;
 }
 
 /* Parse a received overlay-LSA.
@@ -186,13 +252,14 @@ void OSPF::orig_abrLSA() {
 
 void opqLSA::parse_overlay_lsa(LShdr *hdr) {
     // ABR-LSA
-    if (ls_id() == (OPQ_T_MULTI_ABR<<24)) {
+    if ((ls_id()>>24) == OPQ_T_MULTI_ABR) {
         overlayAbrLSA *abrLSA;
 
-        // We check if there is a stored ABR-LSA for this opaque-LSA
         if (!(abrLSA = (overlayAbrLSA *) ospf->abrLSAs.find(adv_rtr()))) {
             abrLSA = new overlayAbrLSA(this);
         }
+
+        this->abrLSA = abrLSA;
 
         ABRhdr *abrhdr;
         byte *end;
@@ -205,12 +272,36 @@ void opqLSA::parse_overlay_lsa(LShdr *hdr) {
         abrLSA->n_nbrs = (ntoh16(hdr->ls_length) - sizeof(LShdr))/sizeof(ABRhdr);
     }
     // Prefix-LSA
-    else if (ls_id() == (OPQ_T_MULTI_PREFIX<<24)) {
+    else if ((ls_id()>>24) == OPQ_T_MULTI_PREFIX) {
+        overlayPrefixLSA *prefLSA;
+        Prefixhdr *prefhdr;
 
+        prefhdr = (Prefixhdr *) (hdr+1);
+
+        if (!(prefLSA = (overlayPrefixLSA *) ospf->prefixLSAs.find(adv_rtr(), (prefhdr->subnet_addr & prefhdr->subnet_mask)))) {
+            prefLSA = new overlayPrefixLSA(this, prefhdr);
+        }
+
+        this->prefixLSA = prefLSA;
+
+        prefLSA->rte = inrttbl->add(prefhdr->subnet_addr, prefhdr->subnet_mask);
+        prefLSA->prefix = prefhdr;
     }
     // ASBR-LSA
-    else if (ls_id() == (OPQ_T_MULTI_ASBR<<24)) {
+    else if ((ls_id()>>24) == OPQ_T_MULTI_ASBR) {
+        overlayAsbrLSA *asbrLSA;
+        ASBRhdr *asbrhdr;
 
+        asbrhdr = (ASBRhdr *) (hdr+1);
+
+        if (!(asbrLSA = (overlayAsbrLSA *) ospf->asbrLSAs.find(adv_rtr(), asbrhdr->dest_rid))) {
+            asbrLSA = new overlayAsbrLSA(this, asbrhdr);
+        }
+
+        this->asbrLSA = asbrLSA;
+
+        asbrLSA->rte = ospf->add_asbr(asbrhdr->dest_rid);
+        asbrLSA->asbr = asbrhdr;
     }
 }
 
@@ -219,73 +310,22 @@ void opqLSA::parse_overlay_lsa(LShdr *hdr) {
 
 void opqLSA::unparse_overlay_lsa() {
     // ABR-LSA
-    if (ls_id() == (OPQ_T_MULTI_ABR<<24)) {
-        overlayAbrLSA *abrLSA;
-        // We check if there is a stored ABR-LSA for this opaque-LSA
-        if ((abrLSA = (overlayAbrLSA *) ospf->abrLSAs.find(adv_rtr()))) {
-            abrLSA->t_dest = 0;
-            abrLSA->n_nbrs = 0;
-        }
+    if ((ls_id()>>24) == OPQ_T_MULTI_ABR) {
+        abrLSA->t_dest = 0;
+        abrLSA->n_nbrs = 0;
+        abrLSA->nbrs = 0;
+        abrLSA = 0;
     }
     // Prefix-LSA
-    else if (ls_id() == (OPQ_T_MULTI_PREFIX<<24)) {
-
+    else if ((ls_id()>>24) == OPQ_T_MULTI_PREFIX) {
+        prefixLSA->rte = 0;
+        prefixLSA->prefix = 0;
+        prefixLSA = 0;
     }
     // ASBR-LSA
-    else if (ls_id() == (OPQ_T_MULTI_ASBR<<24)) {
-
+    else if ((ls_id()>>24) == OPQ_T_MULTI_ASBR) {
+        asbrLSA->rte = 0;
+        asbrLSA->asbr = 0;
+        asbrLSA = 0;
     }
-}
-
-
-
-
-/* Generate and send the Prefix-LSA with AS-scope
- */
-
-void OSPF::send_prefix_lsa(INrte *rte) {
-    //TODO flag on the routes indicating it should be advertised in a prefix-LSA??? might be easier to go through them, rather than checking for every one
-    Prefixhdr *body;
-    lsid_t ls_id;
-    uns32 cost;
-    
-    if (rte == default_route) // skip default route
-        return;
-    
-    if (rte->cost == LSInfinity) // skip unreachable routes
-        return;
-    
-    cost = rte->cost;
-
-    // Build the LSA body
-    ls_id = OPQ_T_MULTI_PREFIX << 24;
-
-    body->metric = hton32(cost);
-    printf("cost done\n");
-    body->subnet_mask = hton32(rte->mask());
-    printf("mask done\n");
-    body->subnet_addr = hton32(rte->net());
-    printf("addr done\n");
-
-    rte->advertise_overlay();
-
-    adv_as_opq(ls_id, (byte *) body, sizeof(Prefixhdr), true, 1);
-}
-
-/* Generate and send the ASBR-LSA with AS-scope
- */
-
-void OSPF::send_asbr_lsa(ASBRrte *rte) { 
-    //TODO flag on the routes indicating it should be advertised in an asbr-LSA???
-    ASBRhdr *body;
-    lsid_t ls_id;
-
-    // Build the LSA body
-    ls_id = OPQ_T_MULTI_ASBR << 24;
-    
-    body->metric = rte->cost;
-    body->dest_rid = rte->rtrid();
-    rte->advertise_overlay();
-
-    adv_as_opq(ls_id, (byte *) body, sizeof(ASBRhdr), true, 1);
 }

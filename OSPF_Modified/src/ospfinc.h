@@ -45,7 +45,7 @@
 #include "spflog.h"
 #include "mcache.h"
 #include "opqlsa.h"
-#include "overlaynbr.h"
+#include "overlay.h"
 #include "ospf.h"
 #include "dbage.h"
 #include "iterator.h"

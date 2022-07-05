@@ -340,14 +340,32 @@ void print_opq_lsa(byte *body, int len, lsid_t opq_type)
             in = *((in_addr *) &abr->neigh_rid);
             printf("\tNeighbor #%d\n", i);
             printf("\tNeighbor RID: %s\n", inet_ntoa(in));
-            printf("\tIntra-area cost to neighbor:\t%d\n\n", ntoh32(abr->metric));
+            printf("\tIntra-area cost to neighbor:\t%d\n\n", abr->metric);
         }
     }
     else if (opq_type == OPQ_T_MULTI_PREFIX) {
+        Prefixhdr *prefix;
+        in_addr in;
 
+        prefix = (Prefixhdr *) body;
+
+        printf("\t\t// Prefix-LSA body\n");
+        in = *((in_addr *) &prefix->subnet_addr);
+        printf("\tPrefix Network Address: %s\n", inet_ntoa(in));
+        in = *((in_addr *) &prefix->subnet_mask);
+        printf("\tPrefix Network Mask: %s\n", inet_ntoa(in));
+        printf("\tIntra-area cost to prefix:\t%d\n\n", prefix->metric);
     }
     else if (opq_type == OPQ_T_MULTI_ASBR) {
+        ASBRhdr *asbr;
+        in_addr in;
 
+        asbr = (ASBRhdr *) body;
+
+        printf("\t\t// ASBR-LSA body\n");
+        in = *((in_addr *) &asbr->dest_rid);
+        printf("\tASBR's RID: %s\n", inet_ntoa(in));
+        printf("\tIntra-area cost to ASBR:\t%d\n\n", asbr->metric);
     }
     else
         print_opq_lsa(body, len);

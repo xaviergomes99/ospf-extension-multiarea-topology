@@ -126,10 +126,14 @@ void DBageTimer::action()
     // Run routing calculations
     if (ospf->full_sched)
 	ospf->full_calculation();
-    if (ospf->abr_changed)
-    ospf->orig_abrLSA();
     if (ospf->ase_sched)
 	ospf->do_all_ases();
+    if (ospf->n_area > 1) {
+        if (ospf->abr_changed)
+        ospf->orig_abrLSA();
+        if (ospf->send_all_prefixes)
+        ospf->advertise_all_prefixes();
+    }
     if (ospf->clear_mospf == true)
         ospf->mospf_clear_cache();
     // Process any pending LSA activity (flooding, origination)

@@ -55,11 +55,9 @@ void opqLSA::parse(LShdr *hdr)
     if (lsa_type == LST_LINK_OPQ && ls_id() == (OPQ_T_HLRST<<24))
         ospf->grace_LSA_rx(this, hdr);
     
-    //TODO don't parse if we are not ABR?? or don't add LSA if not ABR?? (in the recv_update)
-    //both for safety??
-    if (lsa_type == LST_AS_OPQ && (ls_id() == (OPQ_T_MULTI_ABR<<24) || 
-                                   ls_id() == (OPQ_T_MULTI_PREFIX<<24) ||
-                                   ls_id() == (OPQ_T_MULTI_ASBR<<24)))
+    if (lsa_type == LST_AS_OPQ && ((ls_id()>>24) == OPQ_T_MULTI_ABR || 
+                                   (ls_id()>>24) == OPQ_T_MULTI_PREFIX ||
+                                   (ls_id()>>24) == OPQ_T_MULTI_ASBR))
         parse_overlay_lsa(hdr);
 }
 
@@ -73,11 +71,10 @@ void opqLSA::unparse()
     if (lsa_type == LST_LINK_OPQ && ls_id() == (OPQ_T_HLRST<<24))
         ospf->grace_LSA_flushed(this);
 
-    if (lsa_type == LST_AS_OPQ && (ls_id() == (OPQ_T_MULTI_ABR<<24) || 
-                                   ls_id() == (OPQ_T_MULTI_PREFIX<<24) ||
-                                   ls_id() == (OPQ_T_MULTI_ASBR<<24))) {
+    if (lsa_type == LST_AS_OPQ && ((ls_id()>>24) == OPQ_T_MULTI_ABR || 
+                                   (ls_id()>>24) == OPQ_T_MULTI_PREFIX ||
+                                   (ls_id()>>24) == OPQ_T_MULTI_ASBR))
         unparse_overlay_lsa();
-    }
 }
 
 /* Build an opaque-LSA. Since the parse function
@@ -117,6 +114,7 @@ void OSPF::opq_orig(SpfIfc *ip, SpfArea *ap, byte lstype, lsid_t ls_id,
     seq_t seqno;
 
     lsap = (opqLSA *) myLSA(ip, ap, lstype, ls_id);
+    // TODO age prematurely by calling this with adv set to false
     if (!adv) {
         if (lsap) {
 	    lsap->adv_opq = false;

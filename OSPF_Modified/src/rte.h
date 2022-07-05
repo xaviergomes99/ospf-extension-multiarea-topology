@@ -71,6 +71,8 @@ class INtbl {
   protected:
     AVLtree root; 	// Root of AVL tree
   public:
+    int next_id;    // Next Opaque ID to be assigned to a Prefix-LSA
+    
     INrte *add(uns32 net, uns32 mask);
     inline INrte *find(uns32 net, uns32 mask);
     INrte *best_match(uns32 addr);
@@ -115,7 +117,7 @@ class RTE : public AVLitem {
     MPath *last_mpath; 	// Last set of Next hops given to kernel
     uns32 cost;		// Cost of routing table entry
     uns32 t2cost;	// Type 2 cost of entry
-    bool sent_overlay;  // Flag indicating this entry has been advertised to the ABR overlay
+    bool adv_overlay;  // This entry should be advertised in the ABR overlay
 
     RTE(uns32 key_a, uns32 key_b);
     void new_intra(TNode *V, bool stub, uns16 stub_cost, int index);
@@ -135,7 +137,6 @@ class RTE : public AVLitem {
     inline int inter_area();
     inline int intra_AS();
     inline aid_t area();
-    inline void advertise_overlay();
 
     friend class SpfArea;
     friend class summLSA;
@@ -171,10 +172,6 @@ inline aid_t RTE::area()
 {
     return((r_ospf != 0) ? r_ospf->r_area : 0);
 }
-inline void RTE::advertise_overlay()
-{
-    sent_overlay = true;
-}
 
 /* Definition of the IP routing table entry. Organized as a balanced
  * or AVL tree, with the key being the combination of the
@@ -191,6 +188,7 @@ class INrte : public RTE {
   protected:
     INrte *_prefix;	// Previous less specific match
     uns32 tag;		// Advertised tag
+    int uid;    // Unique ID (used as the Opaque ID)
 
   public:
     class summLSA *summs;	// summary-LSAs
@@ -336,6 +334,7 @@ class ASBRrte : public RTE {
     RTRrte *parts; 	// Component RTRrtes
     ASBRrte *sll; 	// Singly-linked list
     class asbrLSA *summs; // ASBR-summary-LSAs
+    int uid;    // Unique ID (used as the Opaque ID)
 
     ASBRrte(uns32 rtrid);
     inline uns32 rtrid();

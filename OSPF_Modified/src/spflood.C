@@ -161,7 +161,6 @@ void SpfNbr::recv_update(Pkt *pdesc)
 			// Otherwise, install and flood
 			if (ospf->spflog(LOG_RXNEWLSA, 1))
 				ospf->log(hdr);
-			//TODO don't need to add LSA if we are not an ABR and it is an overlay-LSA (just flood)
 			lsap = ospf->AddLSA(ip, ap, olsap, hdr, changes);
 			lsap->flood(this, hdr);
 		}

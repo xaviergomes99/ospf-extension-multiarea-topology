@@ -64,6 +64,8 @@ ASBRrte::ASBRrte(uns32 _id) : RTE(_id, 0)
     parts = 0;
     sll = 0;
     summs = 0;
+	uid = ospf->asbr_seq;
+	ospf->asbr_seq++;
 }
 
 /* Constructor for the external data used to import
@@ -595,6 +597,7 @@ void ASBRrte::run_calculation()
     aid_t oa;
     byte otype;
     bool preferred;
+	bool intra_found;
 
     save_state();
     oa = area();
@@ -603,6 +606,7 @@ void ASBRrte::run_calculation()
     cost = Infinity;
 
     preferred = false;
+	intra_found = false;
 
     // Check for intra-area paths
     for (abr = parts; abr; abr = abr->asbr_link) {
@@ -628,12 +632,13 @@ void ASBRrte::run_calculation()
 	        continue;
 	}
 	// Install new best
+	intra_found = true;
 	update(abr->r_mpath);
 	cost = abr->cost;
 	set_area(abr->area());
 	r_type = RT_SPF;
 	preferred = (abr->area() != BACKBONE);
-    }
+	}
 
     // Possibly look at summary-LSAs
     if (r_type != RT_SPF)
@@ -646,9 +651,16 @@ void ASBRrte::run_calculation()
 	declare_unreachable();
     // If the ASBR has changed, redo type-4 summary-LSAs
     if (state_changed() || otype != r_type || oa != area() ||
-	ospf->exiting_htl_restart) {
-	ospf->ase_sched = true;
-	ospf->asbr_orig(this);
+		ospf->exiting_htl_restart) {
+		ospf->ase_sched = true;
+		ospf->asbr_orig(this);
+		// Also originate the ASBR-LSA to advertise in the overlay
+		if (intra_found && (ospf->n_area > 1)) {
+			adv_overlay = true;
+			if (ospf->first_abrLSA_sent) {
+				ospf->orig_asbrLSA(this);
+			}
+		}
     }
 }
 

@@ -317,6 +317,7 @@ INrte *INtbl::add(uns32 net, uns32 mask)
     root.add(rte);
     // Set prefix pointer
     rte->_prefix = 0;
+    rte->uid = next_id++;
     parent = (INrte *) root.previous(net, mask);
     for (; parent; parent = parent->prefix()) {
         if (rte->is_child(parent)) {
