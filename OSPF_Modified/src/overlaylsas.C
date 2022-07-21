@@ -15,6 +15,7 @@ overlayAbrLSA::overlayAbrLSA(opqLSA *opq)
 {
     lsa = opq;
     opq->abrLSA = this;
+    cost = LSInfinity;
     ospf->abrLSAs.add(this);
 }
 
@@ -98,25 +99,6 @@ ABRNbr::~ABRNbr() {
 void ABRNbr::remove_abr_nb() {
     ospf->ABRNbrs.remove(this);
     rtr->abr = 0;
-}
-
-/* Add an ABR to OSPF. If already added, return it. Otherwise
- * allocate entry and add it to the AVL and singly linked list.
- * Similar to the method with the same name used inside the areas,
- * but to be used by the overlay ABRs.
- */
-
-RTRrte *OSPF::add_abr(uns32 rtrid)
-
-{
-    RTRrte *rte;
-
-    if ((rte = (RTRrte *) ABRtree.find(rtrid)))
-        return(rte);
-    
-    rte = new RTRrte(rtrid, 0);
-    ABRtree.add(rte);
-    return(rte);
 }
 
 /* We originate and flood our ABR-LSA inside an Opaque-LSA with
@@ -230,13 +212,13 @@ void OSPF::advertise_all_prefixes() {
 
     // We advertise our intra-area prefixes
     while ((rte = iter.nextrte())) {
-        if ((rte->adv_overlay) && (rte->type() == RT_SPF))
+        if ((rte->adv_overlay) && ((rte->type() == RT_SPF) || rte->type() == RT_DIRECT))
             orig_prefixLSA(rte);
     }
 
     // We also advertise all routes to intra-area reachable ASBRs
     for (asbr = ASBRs; asbr; asbr = asbr->next()) {
-        if ((asbr->adv_overlay) && (asbr->type() == RT_SPF))
+        if ((asbr->adv_overlay) && ((asbr->type() == RT_SPF) || asbr->type() == RT_DIRECT))
             orig_asbrLSA(asbr);
     }
 
@@ -248,6 +230,8 @@ void OSPF::advertise_all_prefixes() {
  *      - ABR-LSA
  *      - Prefix-LSA
  *      - ASBR-LSA
+ * When parsing the LSA, we create the corresponding class object, if it doesn't
+ * yet exist, in order to store the data from the LSA in a more useful manner
  */
 
 void opqLSA::parse_overlay_lsa(LShdr *hdr) {
@@ -262,18 +246,18 @@ void opqLSA::parse_overlay_lsa(LShdr *hdr) {
         this->abrLSA = abrLSA;
 
         ABRhdr *abrhdr;
-        byte *end;
-
         abrhdr = (ABRhdr *) (hdr+1);
-        end = ((byte *) hdr) + ntoh16(hdr->ls_length);
 
-        abrLSA->t_dest = ospf->add_abr(adv_rtr());
         abrLSA->nbrs = abrhdr;
         abrLSA->n_nbrs = (ntoh16(hdr->ls_length) - sizeof(LShdr))/sizeof(ABRhdr);
+
+        // If an ABR-LSA is received, we schedule a full overlay calculation
+        if (adv_rtr() != ospf->my_id())
+            ospf->calc_overlay = true;
     }
     // Prefix-LSA
     else if ((ls_id()>>24) == OPQ_T_MULTI_PREFIX) {
-        overlayPrefixLSA *prefLSA;
+        overlayPrefixLSA *prefLSA, *pref;
         Prefixhdr *prefhdr;
 
         prefhdr = (Prefixhdr *) (hdr+1);
@@ -284,12 +268,40 @@ void opqLSA::parse_overlay_lsa(LShdr *hdr) {
 
         this->prefixLSA = prefLSA;
 
-        prefLSA->rte = inrttbl->add(prefhdr->subnet_addr, prefhdr->subnet_mask);
+        prefLSA->rte = inrttbl->add(ntoh32(prefhdr->subnet_addr), ntoh32(prefhdr->subnet_mask));
+        if (!prefLSA->rte->intra_area()  && !(prefLSA->rte->type() == RT_DIRECT))
+            prefLSA->rte->r_type = RT_SPFIA;
         prefLSA->prefix = prefhdr;
+
+        // Link this prefix-LSA to the list of prefix-LSAs associated to this prefix
+        prefLSA->link = prefLSA->rte->prefixes;
+        prefLSA->rte->prefixes = prefLSA;
+        
+        // Originate the corresponding summ-LSA, if there isn't a 
+        // full overlay calculation scheduled
+        if (ospf->first_abrLSA_sent && !ospf->calc_overlay) {
+            uns32 best_cost = LSInfinity, cost;
+            overlayAbrLSA *abr;
+            for (pref = prefLSA->rte->prefixes; pref; pref = (overlayPrefixLSA *) pref->link) {
+                abr = (overlayAbrLSA *) ospf->abrLSAs.find(pref->lsa->adv_rtr());
+                if (abr) {
+                    cost = abr->cost + pref->prefix->metric;
+                    if (cost < best_cost)
+                        best_cost = cost;
+                }
+            }
+            // Assign the best cost to the routing table entry and
+            // generate the corresponding Summ-LSA, if the cost has changed
+            if (prefLSA->rte->cost != best_cost || !prefLSA->rte->has_been_adv) {
+                prefLSA->rte->cost = best_cost;
+                prefLSA->rte->has_been_adv = true;
+                ospf->sl_orig(prefLSA->rte);
+            }
+        }
     }
     // ASBR-LSA
     else if ((ls_id()>>24) == OPQ_T_MULTI_ASBR) {
-        overlayAsbrLSA *asbrLSA;
+        overlayAsbrLSA *asbrLSA, *asbr;
         ASBRhdr *asbrhdr;
 
         asbrhdr = (ASBRhdr *) (hdr+1);
@@ -301,7 +313,34 @@ void opqLSA::parse_overlay_lsa(LShdr *hdr) {
         this->asbrLSA = asbrLSA;
 
         asbrLSA->rte = ospf->add_asbr(asbrhdr->dest_rid);
+        if (!asbrLSA->rte->intra_area() && asbrLSA->rte->type() != RT_DIRECT)
+            asbrLSA->rte->r_type = RT_SPFIA;
         asbrLSA->asbr = asbrhdr;
+
+        asbrLSA->link = asbrLSA->rte->asbr_lsas;
+        asbrLSA->rte->asbr_lsas = asbrLSA;
+
+        // Originate the corresponding ASBR-Summ-LSA, if there isn't a 
+        // full overlay calculation scheduled
+        if (ospf->first_abrLSA_sent && !ospf->calc_overlay) {
+            uns32 best_cost = LSInfinity, cost;
+            overlayAbrLSA *abr;
+            for (asbr = asbrLSA->rte->asbr_lsas; asbr; asbr = (overlayAsbrLSA *) asbr->link) {
+                abr = (overlayAbrLSA *) ospf->abrLSAs.find(asbr->lsa->adv_rtr());
+                if (abr) {
+                    cost = abr->cost + asbr->asbr->metric;
+                    if (cost < best_cost)
+                        best_cost = cost;
+                }
+            }
+            // Assign the best cost to the routing table entry and
+            // generate the corresponding ASBR-Summ-LSA, if the cost has changed
+            if (asbrLSA->rte->cost != best_cost || !asbrLSA->rte->has_been_adv) {
+                asbrLSA->rte->cost = best_cost;
+                asbrLSA->rte->has_been_adv = true;
+                ospf->asbr_orig(asbrLSA->rte);
+            }
+        }
     }
 }
 
@@ -311,7 +350,6 @@ void opqLSA::parse_overlay_lsa(LShdr *hdr) {
 void opqLSA::unparse_overlay_lsa() {
     // ABR-LSA
     if ((ls_id()>>24) == OPQ_T_MULTI_ABR) {
-        abrLSA->t_dest = 0;
         abrLSA->n_nbrs = 0;
         abrLSA->nbrs = 0;
         abrLSA = 0;
@@ -321,11 +359,35 @@ void opqLSA::unparse_overlay_lsa() {
         prefixLSA->rte = 0;
         prefixLSA->prefix = 0;
         prefixLSA = 0;
+
+        overlayPrefixLSA *ptr, *pref = prefixLSA;
+        overlayPrefixLSA **prev;
+
+        if (!pref->rte)
+	        return;
+        // Unlink from list in routing table
+        for (prev = &pref->rte->prefixes; (ptr = *prev); prev = (overlayPrefixLSA **)&ptr->link)
+	    if (*prev == pref) {
+	        *prev = (overlayPrefixLSA *) pref->link;
+	        break;
+	    }
     }
     // ASBR-LSA
     else if ((ls_id()>>24) == OPQ_T_MULTI_ASBR) {
         asbrLSA->rte = 0;
         asbrLSA->asbr = 0;
         asbrLSA = 0;
+        
+        overlayAsbrLSA *ptr, *asbr = asbrLSA;
+        overlayAsbrLSA **prev;
+
+        if (!asbr->rte)
+	        return;
+        // Unlink from list in routing table
+        for (prev = &asbr->rte->asbr_lsas; (ptr = *prev); prev = (overlayAsbrLSA **)&ptr->link)
+	    if (*prev == asbr) {
+	        *prev = (overlayAsbrLSA *) asbr->link;
+	        break;
+	    }
     }
 }

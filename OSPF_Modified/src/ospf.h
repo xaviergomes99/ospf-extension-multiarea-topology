@@ -173,14 +173,14 @@ class OSPF : public ConfigItem {
     bool abr_changed;   // Changes to our ABR-LSA contents
     bool first_abrLSA_sent; // The first ABR-LSA has been advertised in the ABR overlay
     bool send_all_prefixes; // Advertise all the current prefixes and ASBRs in the overlay
+    bool calc_overlay;  // Perform the complete overlay topology calculations
     int asbr_seq;   // Next value for the opaque-ID to be assigned to a ASBR-LSA
     AVLtree ABRNbrs;    // List of all our neighboring ABRs
     AVLtree added_nbrs; // List of the currently added neighbors
     AVLtree abrLSAs;    // List of all ABR-LSAs
     AVLtree prefixLSAs; // List of all Prefix-LSAs 
     AVLtree asbrLSAs;   // List of all ASBR-LSAs
-    AVLtree ABRtree;    // AVL tree of all the ABRs
-    uns32 n_overlay_dijkstras;
+    uns32 n_overlay_dijkstras;  // Number of Dijkstra's calculations performed over the ABR overlay
 
     // Monitoring routines
     class MonMsg *get_monbuf(int size);
@@ -328,10 +328,10 @@ class OSPF : public ConfigItem {
     void orig_prefixLSA(INrte *);
     void orig_asbrLSA(ASBRrte *);
     void advertise_all_prefixes();
-    RTRrte *add_abr(uns32 rtrid);
 
     void overlay_calc();
     void overlay_dijkstra();
+    void prefix_scan();
 
     // Logging routines
     bool spflog(int, int);

@@ -69,7 +69,8 @@ class OpqHoldQ : public AVLitem {
 
 class overlayAbrLSA : public PriQElt, public AVLitem {
     opqLSA *lsa;    // Corresponding opaque-LSA
-    RTRrte *t_dest; // Destination routing table entry
+    uns32 cost;     // Cost to the ABR
+    byte overlay_dijk_run:1;    // Overlay Dijkstra run
     byte t_state;   // Current state of this ABR, in the dijkstra calc
     ABRhdr *nbrs;   // Neighbors described in the LSA
     int n_nbrs;     // Number of neighbors described
@@ -84,6 +85,7 @@ class overlayPrefixLSA : public AVLitem {
     opqLSA *lsa;        // Corresponding opaque-LSA
     INrte *rte;         // Associated routing table entry
     Prefixhdr *prefix;  // Prefix information
+    overlayPrefixLSA *link; // Link together
 public:
     overlayPrefixLSA(class opqLSA *, Prefixhdr *p);
     ~overlayPrefixLSA();
@@ -95,6 +97,7 @@ class overlayAsbrLSA : public AVLitem {
     opqLSA *lsa;    // Corresponding opaque-LSA
     ASBRrte *rte;   // Associated routing table entry
     ASBRhdr *asbr;  // Destination ASBR information
+    overlayAsbrLSA *link;   // Link together
 public:
     overlayAsbrLSA(class opqLSA *, ASBRhdr *asbr);
     ~overlayAsbrLSA();

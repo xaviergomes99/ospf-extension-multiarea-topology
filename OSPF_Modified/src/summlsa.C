@@ -63,15 +63,18 @@ void summLSA::reoriginate(int forced)
 void OSPF::sl_orig(INrte *rte, bool transit_changes_only)
 
 {
-    SpfArea *ap;
-    AreaIterator aiter(ospf);
+    // prevent intra-area routers from generating summ-LSAs???
+    if (n_area > 1) {
+        SpfArea *ap;
+        AreaIterator aiter(ospf);
 
-    while ((ap = aiter.get_next())) {
-	if (transit_changes_only &&
-	    ap->was_transit == ap->a_transit)
-	    continue;
-	if (ap->n_active_if != 0)
-	    ap->sl_orig(rte);
+        while ((ap = aiter.get_next())) {
+        if (transit_changes_only &&
+            ap->was_transit == ap->a_transit)
+            continue;
+        if (ap->n_active_if != 0)
+            ap->sl_orig(rte);
+        }
     }
 }
 
@@ -125,7 +128,6 @@ void SpfArea::sl_orig(INrte *rte, int forced)
 uns32 SpfArea::sl_cost(INrte *rte)
 
 {
-    // TODO summary LSA restrictions
     aid_t home;
     uns32 cost;
 
@@ -157,6 +159,7 @@ uns32 SpfArea::sl_cost(INrte *rte)
     }
     else if (rte->type() != RT_SPF)
 	return(LSInfinity);
+    //TODO attention here (restrictions)
     else if (rte->r_mpath->all_in_area(this))
 	return(LSInfinity);
     else if ((!a_transit || rte->area() != BACKBONE) &&
@@ -167,9 +170,10 @@ uns32 SpfArea::sl_cost(INrte *rte)
 	cost = rte->cost;
     }
 
+    // Allow to originate into the same area
     // Don't originate into same area
-    if (a_id == home)
-	return(LSInfinity);
+    // if (a_id == home)
+	// return(LSInfinity);
 
     return(cost);
 }
@@ -321,15 +325,20 @@ void INrte::run_inter_area()
     SpfArea *summ_ap;
     byte new_type;
 
-    if (r_type == RT_SPF || r_type == RT_DIRECT)
+    // Even if we have a intra-area path to the destination, we will
+    // still try and find a better inter-area path to it 
+    if (/*r_type == RT_SPF || */r_type == RT_DIRECT)
 	    return;
     // Saved state checked later in OSPF::rt_scan()
-    if (r_type == RT_SPFIA)
+    if (r_type == RT_SPFIA || r_type == RT_SPF)
 	    save_state();
 
     new_type = RT_NONE;
     best_path = 0;
-    cost = LSInfinity;
+    if (r_type == RT_SPF)
+        cost = this->cost;
+    else
+        cost = LSInfinity;
     summ_ap = ospf->SummaryArea();
     // Go through list of summary-LSAs
     for (lsap = summs; lsap; lsap = (summLSA *)lsap->link) {

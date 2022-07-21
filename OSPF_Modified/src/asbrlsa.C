@@ -91,7 +91,7 @@ void SpfArea::asbr_orig(ASBRrte *rte, int forced)
 	    cost = LSInfinity;
     else if (!rte->valid())
 	    cost = LSInfinity;
-    else if (rte->r_mpath->all_in_area(this))
+    else if (rte->r_mpath->all_in_area(this)/* && !rte->adv_overlay*/)
 	    cost = LSInfinity;
     else if (rte->type() == RT_SPF || rte->type() == RT_SPFIA) {
         home = rte->area();
@@ -101,7 +101,7 @@ void SpfArea::asbr_orig(ASBRrte *rte, int forced)
 	    cost = LSInfinity;
 
     // Don't originate into same area
-    if (cost == LSInfinity || a_id == home) {
+    if (cost == LSInfinity/* || a_id == home*/) {
         lsa_flush(olsap);
         return;
     }

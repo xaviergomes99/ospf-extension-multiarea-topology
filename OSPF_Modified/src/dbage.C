@@ -133,6 +133,8 @@ void DBageTimer::action()
         ospf->orig_abrLSA();
         if (ospf->send_all_prefixes)
         ospf->advertise_all_prefixes();
+        if (ospf->calc_overlay)
+        ospf->overlay_calc();
     }
     if (ospf->clear_mospf == true)
         ospf->mospf_clear_cache();

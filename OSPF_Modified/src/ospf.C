@@ -122,12 +122,13 @@ OSPF::OSPF(uns32 rtid, SPFtime grace) : myid(rtid)
     n_helping = 0;
 
     n_dijkstras = 0;
-    n_overlay_dijkstras = 0;
 
     //Multi-area extension variables init
+    n_overlay_dijkstras = 0;
     abr_changed = false;
     first_abrLSA_sent = false;
     send_all_prefixes = false;
+    calc_overlay = false;
     asbr_seq = 0;
 
     // Initialize logging

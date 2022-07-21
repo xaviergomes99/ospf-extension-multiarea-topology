@@ -64,6 +64,7 @@ ASBRrte::ASBRrte(uns32 _id) : RTE(_id, 0)
     parts = 0;
     sll = 0;
     summs = 0;
+	asbr_lsas = 0;
 	uid = ospf->asbr_seq;
 	ospf->asbr_seq++;
 }
@@ -640,8 +641,9 @@ void ASBRrte::run_calculation()
 	preferred = (abr->area() != BACKBONE);
 	}
 
+	// Instead, always check the summary-LSAs
     // Possibly look at summary-LSAs
-    if (r_type != RT_SPF)
+    // if (r_type != RT_SPF)
 	run_inter_area();
     // Adjust for virtual links
     if (intra_AS() && area() == BACKBONE)

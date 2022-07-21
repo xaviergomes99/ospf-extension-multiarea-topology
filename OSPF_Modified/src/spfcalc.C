@@ -88,9 +88,6 @@ void OSPF::rtsched(LSA *newlsa, RTE *old_rte)
 				rte->run_external();
 				mospf_clear_external_source(rte);
 			}
-		//TODO include case for AS-scoped oapque-lsas (for ABRs only)
-		case LST_AS_OPQ:
-			break;
 		default:
 			break;
     }
@@ -279,6 +276,7 @@ RTE::RTE(uns32 key_a, uns32 key_b) : AVLitem(key_a, key_b)
     cost = Infinity;
     t2cost = Infinity;
 	adv_overlay = false;
+	has_been_adv = false;
 }
 
 /* There is a newly discovered intra-area route to a transit
@@ -626,10 +624,10 @@ void OSPF::rt_scan()
 		if (rte->changed || rte->state_changed() || exiting_htl_restart) {
 			rte->changed = false;
 			rte->sys_install();
-			if (!rte->is_range()) {
+			if (!rte->is_range() && ospf->n_area > 1) {
 				sl_orig(rte);
 				rte->adv_overlay = true;
-				if ((ospf->n_area > 1) && (ospf->first_abrLSA_sent) && (rte->type() == RT_SPF))
+				if ((ospf->first_abrLSA_sent) && (rte->type() == RT_SPF))
 					orig_prefixLSA(rte);
 			}
 		}
@@ -638,7 +636,8 @@ void OSPF::rt_scan()
 		else if (transit_changes &&
 			rte->intra_area() &&
 			rte->area() == BACKBONE &&
-			!rte->is_range())
+			!rte->is_range() &&
+			ospf->n_area > 1)
 			sl_orig(rte, true);
     }
 }
@@ -871,6 +870,11 @@ void INrte::incremental_summary(SpfArea *a)
 
     otype = r_type;
     oa = area();
+
+	// Prevent ABRs from processing this
+	if (ospf->n_area > 1)
+		return;
+
     if (intra_AS())
 	save_state();
 

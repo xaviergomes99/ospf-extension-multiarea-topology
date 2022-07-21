@@ -117,7 +117,8 @@ class RTE : public AVLitem {
     MPath *last_mpath; 	// Last set of Next hops given to kernel
     uns32 cost;		// Cost of routing table entry
     uns32 t2cost;	// Type 2 cost of entry
-    bool adv_overlay;  // This entry should be advertised in the ABR overlay
+    bool adv_overlay;   // This entry should be advertised in the ABR overlay
+    bool has_been_adv;  // This entry has already been advertised by an ABR?
 
     RTE(uns32 key_a, uns32 key_b);
     void new_intra(TNode *V, bool stub, uns16 stub_cost, int index);
@@ -141,6 +142,7 @@ class RTE : public AVLitem {
     friend class SpfArea;
     friend class summLSA;
     friend class FWDrte;
+    friend class opqLSA;
 };
 
 // Inline functions
@@ -193,6 +195,7 @@ class INrte : public RTE {
   public:
     class summLSA *summs;	// summary-LSAs
     class ASextLSA *ases;	// AS-external-LSAs
+    class overlayPrefixLSA *prefixes;   // Prefix-LSAs
     class ExRtData *exlist;	// Statically configured routes
     class ExRtData *exdata;	// When we're importing information
     byte range:1,		// Configured area address range?
@@ -229,6 +232,7 @@ inline INrte::INrte(uns32 xnet, uns32 xmask) : RTE(xnet, xmask)
     tag = 0;
     summs = 0;
     ases = 0;
+    prefixes = 0;
     exdata = 0;
     exlist = 0;
     range = false;
@@ -334,6 +338,7 @@ class ASBRrte : public RTE {
     RTRrte *parts; 	// Component RTRrtes
     ASBRrte *sll; 	// Singly-linked list
     class asbrLSA *summs; // ASBR-summary-LSAs
+    class overlayAsbrLSA *asbr_lsas;    // ASBR-LSAs (overlay)
     int uid;    // Unique ID (used as the Opaque ID)
 
     ASBRrte(uns32 rtrid);

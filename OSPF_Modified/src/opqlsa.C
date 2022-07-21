@@ -55,9 +55,11 @@ void opqLSA::parse(LShdr *hdr)
     if (lsa_type == LST_LINK_OPQ && ls_id() == (OPQ_T_HLRST<<24))
         ospf->grace_LSA_rx(this, hdr);
     
-    if (lsa_type == LST_AS_OPQ && ((ls_id()>>24) == OPQ_T_MULTI_ABR || 
-                                   (ls_id()>>24) == OPQ_T_MULTI_PREFIX ||
-                                   (ls_id()>>24) == OPQ_T_MULTI_ASBR))
+    if (ospf->n_area > 1 &&
+        lsa_type == LST_AS_OPQ && 
+            ((ls_id()>>24) == OPQ_T_MULTI_ABR || 
+             (ls_id()>>24) == OPQ_T_MULTI_PREFIX ||
+             (ls_id()>>24) == OPQ_T_MULTI_ASBR))
         parse_overlay_lsa(hdr);
 }
 
@@ -71,9 +73,11 @@ void opqLSA::unparse()
     if (lsa_type == LST_LINK_OPQ && ls_id() == (OPQ_T_HLRST<<24))
         ospf->grace_LSA_flushed(this);
 
-    if (lsa_type == LST_AS_OPQ && ((ls_id()>>24) == OPQ_T_MULTI_ABR || 
-                                   (ls_id()>>24) == OPQ_T_MULTI_PREFIX ||
-                                   (ls_id()>>24) == OPQ_T_MULTI_ASBR))
+    if (ospf->n_area > 1 &&
+        lsa_type == LST_AS_OPQ && 
+            ((ls_id()>>24) == OPQ_T_MULTI_ABR || 
+             (ls_id()>>24) == OPQ_T_MULTI_PREFIX ||
+             (ls_id()>>24) == OPQ_T_MULTI_ASBR))
         unparse_overlay_lsa();
 }
 
