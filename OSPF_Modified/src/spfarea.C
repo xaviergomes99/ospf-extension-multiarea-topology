@@ -298,7 +298,6 @@ void SpfArea::IfcChange(int increment)
 void SpfArea::generate_summaries()
 
 {
-    //TODO check this
     INrte *rte;
     INiterator iter(inrttbl);
     ASBRrte *rrte;

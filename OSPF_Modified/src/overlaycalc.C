@@ -12,12 +12,13 @@
 void OSPF::overlay_calc()
 
 {
-    calc_overlay = false;
-    // Run the Dijkstra calculation for the ABR overlay
-    overlay_dijkstra();
-    // Scan the present Prefix-LSAs and ASBR-LSAs
-    prefix_scan();
-    printf("after calc\n");
+    if (first_abrLSA_sent) {
+        calc_overlay = false;
+        // Run the Dijkstra calculation for the ABR overlay
+        overlay_dijkstra();
+        // Scan the present Prefix-LSAs and ASBR-LSAs
+        prefix_scan();
+    }
 }
 
 /* Dijsktra calculation performed over the ABR overlay.
@@ -45,24 +46,26 @@ void OSPF::overlay_dijkstra()
             cand.priq_add(abr);
             abr->t_state = DS_ONCAND;
         }
-        else
+        else {
             abr->t_state = DS_UNINIT;
+            abr->cost0 = Infinity;
+        }
     }
 
     // Go through the candidate list
     while ((abr = (overlayAbrLSA *) cand.priq_rmhead())) {
         ABRhdr *nbr;
-        overlayAbrLSA *abr_nbr;
+        overlayAbrLSA *abr_nbr = 0;
         uns32 new_cost;
         int i;
 
         // Put onto SPF tree
         abr->t_state = DS_ONTREE;
-        if (!(abr->cost0 > abr->cost))
-            abr->cost = abr->cost0;
+        abr->cost = abr->cost0;
 
         // Scan neighboring ABRs
-        for (nbr = abr->nbrs, i = 0; i < abr->n_nbrs; nbr++, i++) {
+        nbr = (ABRhdr *) abr->lsa->lsa_body;
+        for (i = 0; i < abr->n_nbrs; nbr++, i++) {
             abr_nbr = (overlayAbrLSA *) abrLSAs.find(nbr->neigh_rid);
             if (abr_nbr) {
                 if (abr_nbr->t_state == DS_ONTREE)
@@ -104,48 +107,57 @@ void OSPF::prefix_scan()
     overlayAbrLSA *abr;
     ASBRrte *rrte;
     uns32 cost, best_cost;
+    bool found = false;
+    // rtid_t rid;
     
     // Go through all the Prefix-LSAs associated to each INrte
     while ((rte = iter.nextrte())) {
         if (rte->prefixes) {
             best_cost = LSInfinity;
             for (pref = rte->prefixes; pref; pref = (overlayPrefixLSA *) pref->link) {
-                abr = (overlayAbrLSA *) abrLSAs.find(pref->lsa->adv_rtr());
-                if (abr) {
-                    cost = abr->cost + pref->prefix->metric;
-                    if (cost < best_cost)
+                if ((abr = (overlayAbrLSA *) abrLSAs.find(pref->index1()))) {
+                    found = true;
+                    cost = abr->cost + pref->prefix.metric;
+                    if (cost < best_cost) {
                         best_cost = cost;
+                        // rid = abr->index1();
+                    }
                 }
             }
             // Assign the best cost to the routing table entry and
             // generate the corresponding Summ-LSA, if the cost has changed
-            if (rte->cost != best_cost || !rte->has_been_adv) {
+            if (found && (rte->cost != best_cost || !rte->has_been_adv)) {
                 rte->cost = best_cost;
                 rte->has_been_adv = true;
                 sl_orig(rte);
+                // if (rid != my_id())
+                //     rte->waiting_for_summ = true;
             }
         }
     }
+
+    found = false;
 
     // Then go through the all the ASBR-LSAs for each of the ASBRs known
     for (rrte = ASBRs; rrte; rrte = rrte->next()) {
         if (rrte->asbr_lsas) {
             best_cost = LSInfinity;
             for (asbr = rrte->asbr_lsas; asbr; asbr = (overlayAsbrLSA *) asbr->link) {
-                abr = (overlayAbrLSA *) abrLSAs.find(asbr->lsa->adv_rtr());
-                if (abr) {
-                    cost = abr->cost + asbr->asbr->metric;
+                if ((abr = (overlayAbrLSA *) abrLSAs.find(asbr->index1()))) {
+                    found = true;
+                    cost = abr->cost + asbr->asbr.metric;
                     if (cost < best_cost)
                         best_cost = cost;
                 } 
             }
             // Assign the best cost to the routing table entry and
             // generate the corresponding Summ-LSA, if the cost has changed
-            if (asbr->rte->cost != best_cost || !asbr->rte->has_been_adv) {
+            if (found && (asbr->rte->cost != best_cost || !asbr->rte->has_been_adv)) {
                 asbr->rte->cost = best_cost;
                 asbr->rte->has_been_adv = true;
                 asbr_orig(asbr->rte);
+                rte->run_inter_area();
             }
         } 
     }
-} 
+}

@@ -323,8 +323,9 @@ void print_opq_lsa(byte *body, int len)
 void print_opq_lsa(byte *body, int len, lsid_t opq_type)
 
 {
+    lsid_t type = (opq_type >> 24);
     // ABR-LSA
-    if (opq_type == OPQ_T_MULTI_ABR) {
+    if (type == OPQ_T_MULTI_ABR) {
         ABRhdr *abr;
         byte *end;
         int	i;
@@ -343,7 +344,7 @@ void print_opq_lsa(byte *body, int len, lsid_t opq_type)
             printf("\tIntra-area cost to neighbor:\t%d\n\n", abr->metric);
         }
     }
-    else if (opq_type == OPQ_T_MULTI_PREFIX) {
+    else if (type == OPQ_T_MULTI_PREFIX) {
         Prefixhdr *prefix;
         in_addr in;
 
@@ -356,7 +357,7 @@ void print_opq_lsa(byte *body, int len, lsid_t opq_type)
         printf("\tPrefix Network Mask: %s\n", inet_ntoa(in));
         printf("\tIntra-area cost to prefix:\t%d\n\n", prefix->metric);
     }
-    else if (opq_type == OPQ_T_MULTI_ASBR) {
+    else if (type == OPQ_T_MULTI_ASBR) {
         ASBRhdr *asbr;
         in_addr in;
 

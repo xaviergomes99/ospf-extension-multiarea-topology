@@ -605,6 +605,8 @@ void ASBRrte::run_calculation()
     otype = r_type;
     r_type = RT_NONE;
     cost = Infinity;
+	intra_cost = LSInfinity;
+	has_intra_path = false;
 
     preferred = false;
 	intra_found = false;
@@ -638,6 +640,8 @@ void ASBRrte::run_calculation()
 	cost = abr->cost;
 	set_area(abr->area());
 	r_type = RT_SPF;
+	has_intra_path = true;
+	intra_cost = cost;
 	preferred = (abr->area() != BACKBONE);
 	}
 
@@ -652,17 +656,16 @@ void ASBRrte::run_calculation()
     if (intra_AS() && r_mpath == 0)
 	declare_unreachable();
     // If the ASBR has changed, redo type-4 summary-LSAs
-    if (state_changed() || otype != r_type || oa != area() ||
-		ospf->exiting_htl_restart) {
+    if ((state_changed() || otype != r_type || oa != area() ||
+		ospf->exiting_htl_restart) && (ospf->n_area > 1)) {
 		ospf->ase_sched = true;
-		ospf->asbr_orig(this);
 		// Also originate the ASBR-LSA to advertise in the overlay
-		if (intra_found && (ospf->n_area > 1)) {
+		if (intra_found && ospf->first_abrLSA_sent) {
 			adv_overlay = true;
-			if (ospf->first_abrLSA_sent) {
-				ospf->orig_asbrLSA(this);
-			}
+			ospf->orig_asbrLSA(this);
 		}
+		else if (!ospf->first_abrLSA_sent)
+			ospf->asbr_orig(this);
     }
 }
 

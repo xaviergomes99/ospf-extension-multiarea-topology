@@ -200,6 +200,7 @@ OSPF::~OSPF()
     // Free memory allocated by OSPF class
     extLSAs.clear();
     ASBRtree.clear();
+    ABRtree.clear();
     dna_flushq.clear();
     ABRNbrs.clear();
     abrLSAs.clear();

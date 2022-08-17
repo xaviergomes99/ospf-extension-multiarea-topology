@@ -253,8 +253,8 @@ LSA *OSPF::AddLSA(SpfIfc *ip,SpfArea *ap,LSA *current,LShdr *hdr,bool changed)
     ParseLSA(lsap, hdr);
     update_lsdb_xsum(lsap, true);
     // Provide Opaque-LSAs to requesters
-    if (hdr->ls_type >= LST_LINK_OPQ && hdr->ls_type <= LST_AS_OPQ)
-        upload_opq(lsap);
+    //if (hdr->ls_type >= LST_LINK_OPQ && hdr->ls_type <= LST_AS_OPQ)
+    //    upload_opq(lsap);
     // If changes, schedule new routing calculations
     if (changed) {
 		rtsched(lsap, old_rte);

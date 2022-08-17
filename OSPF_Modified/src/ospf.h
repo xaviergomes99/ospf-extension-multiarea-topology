@@ -180,6 +180,7 @@ class OSPF : public ConfigItem {
     AVLtree abrLSAs;    // List of all ABR-LSAs
     AVLtree prefixLSAs; // List of all Prefix-LSAs 
     AVLtree asbrLSAs;   // List of all ASBR-LSAs
+    AVLtree ABRtree;    // Tree of all ABRs
     uns32 n_overlay_dijkstras;  // Number of Dijkstra's calculations performed over the ABR overlay
 
     // Monitoring routines
@@ -332,6 +333,8 @@ class OSPF : public ConfigItem {
     void overlay_calc();
     void overlay_dijkstra();
     void prefix_scan();
+
+    ABRrte *add_abr(uns32 rtrid);
 
     // Logging routines
     bool spflog(int, int);

@@ -88,6 +88,14 @@ void OSPF::rtsched(LSA *newlsa, RTE *old_rte)
 				rte->run_external();
 				mospf_clear_external_source(rte);
 			}
+			break;
+		case LST_AS_OPQ:
+			if ((n_area > 1) && 
+				((newlsa->ls_id()>>24) == OPQ_T_MULTI_ABR) && 
+				(newlsa->adv_rtr() != my_id())) {
+				calc_overlay = true;
+			}
+			break;
 		default:
 			break;
     }
@@ -277,6 +285,9 @@ RTE::RTE(uns32 key_a, uns32 key_b) : AVLitem(key_a, key_b)
     t2cost = Infinity;
 	adv_overlay = false;
 	has_been_adv = false;
+	has_intra_path = false;
+	intra_cost = LSInfinity;
+	// waiting_for_summ = false;
 }
 
 /* There is a newly discovered intra-area route to a transit
@@ -314,6 +325,8 @@ void RTE::new_intra(TNode *V, bool stub, uns16 stub_cost, int _index)
     // Update routing table entry
     r_type = RT_SPF;
     cost = total_cost;
+	has_intra_path = true;
+	intra_cost = cost;
     set_origin(V);
     set_area(V->area()->id());
 	// Nodes other than the root have next hops in T_Node
@@ -431,9 +444,11 @@ LSA *RTE::get_origin()
 void RTE::declare_unreachable()
 {
     r_type = RT_NONE;
+	has_intra_path = false;
     delete r_ospf;
     r_ospf = 0;
     cost = LSInfinity;
+	intra_cost = LSInfinity;
     r_mpath = 0;
 	adv_overlay = false;
 }
@@ -455,7 +470,16 @@ void INrte::declare_unreachable()
     if (r_type == RT_DIRECT)
 		ospf->full_sched = true;
 	
-	//TODO remove corresponding overlay-LSA from the network (age prematurely)
+	// Prematurely age the prefix we originated for this RTE
+	if (prefixes) {
+		overlayPrefixLSA *pref;
+		for (pref = prefixes; pref; pref = (overlayPrefixLSA *) pref->link) {
+			if (pref->lsa->adv_rtr() == ospf->my_id()) {
+				pref->lsa->adv_opq = false;
+				pref->lsa->reoriginate(false);
+			}
+		}
+	}
 
     RTE::declare_unreachable();
 }
@@ -625,10 +649,15 @@ void OSPF::rt_scan()
 			rte->changed = false;
 			rte->sys_install();
 			if (!rte->is_range() && ospf->n_area > 1) {
-				sl_orig(rte);
-				rte->adv_overlay = true;
-				if ((ospf->first_abrLSA_sent) && (rte->type() == RT_SPF))
-					orig_prefixLSA(rte);
+				if (rte->has_intra_path && rte->intra_cost != LSInfinity) {
+					rte->adv_overlay = true;
+					if (ospf->first_abrLSA_sent)
+						orig_prefixLSA(rte);
+					else { // If there is only 1 ABR in the network
+						rte->has_been_adv = true;
+						sl_orig(rte);
+					}
+				}
 			}
 		}
 		// Don't originate summaries of backbone routes
@@ -823,8 +852,10 @@ void FWDrte::resolve()
     
     ifp = ospf->find_nbr_ifc(address());
     match = inrttbl->best_match(address());
-    if (!match || !match->intra_AS())
-	r_type = RT_NONE;
+    if (!match || !match->intra_AS()) {
+		r_type = RT_NONE;
+		has_intra_path = false;
+	}
     else {
 	r_type = match->type();
 	new_path = MPath::addgw(match->r_mpath, address());
@@ -872,8 +903,9 @@ void INrte::incremental_summary(SpfArea *a)
     oa = area();
 
 	// Prevent ABRs from processing this
-	if (ospf->n_area > 1)
+	if (ospf->n_area > 1) {
 		return;
+	}
 
     if (intra_AS())
 	save_state();
@@ -898,7 +930,7 @@ void INrte::incremental_summary(SpfArea *a)
 	// Install in kernel routing table
 	sys_install();
 	// Originate new summary-LSA
-	ospf->sl_orig(this);
+	//ospf->sl_orig(this);
 	// Recalculate forwarding addresses
 	fa_tbl->resolve();
 	// Clear multicast cache with this source

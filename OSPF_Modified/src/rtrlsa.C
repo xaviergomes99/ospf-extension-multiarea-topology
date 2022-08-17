@@ -499,7 +499,7 @@ void rtrLSA::parse(LShdr *hdr)
 			}
 			// There is a link to a ABRNbr created, but it is wrong
 			else if ((abr->get_rid() != orig_rtr) || (abr->get_rtrLSA() != this)) {
-				ospf->ABRNbrs.remove(abr);
+				abr->remove_abr_nb();
 				abr = new ABRNbr(orig_rtr, this, area());
 			}
 		}

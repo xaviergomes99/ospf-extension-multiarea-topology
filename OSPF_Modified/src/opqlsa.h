@@ -54,6 +54,7 @@ public:
     virtual void unparse_overlay_lsa();
     SpfNbr *grace_lsa_parse(byte *, int, int &);
     friend class OSPF;
+    friend class INrte;
 };
 
 /* Holding queue for Opaque-LSAs that are to be delivered
@@ -72,7 +73,7 @@ class overlayAbrLSA : public PriQElt, public AVLitem {
     uns32 cost;     // Cost to the ABR
     byte overlay_dijk_run:1;    // Overlay Dijkstra run
     byte t_state;   // Current state of this ABR, in the dijkstra calc
-    ABRhdr *nbrs;   // Neighbors described in the LSA
+    // ABRhdr *nbrs;   // Neighbors described in the LSA
     int n_nbrs;     // Number of neighbors described
 public:
     overlayAbrLSA(class opqLSA *);
@@ -84,25 +85,27 @@ public:
 class overlayPrefixLSA : public AVLitem {
     opqLSA *lsa;        // Corresponding opaque-LSA
     INrte *rte;         // Associated routing table entry
-    Prefixhdr *prefix;  // Prefix information
+    Prefixhdr prefix;  // Prefix information
     overlayPrefixLSA *link; // Link together
 public:
     overlayPrefixLSA(class opqLSA *, Prefixhdr *p);
     ~overlayPrefixLSA();
     friend class OSPF;
     friend class opqLSA;
+    friend class INrte;
 };
 
 class overlayAsbrLSA : public AVLitem {
     opqLSA *lsa;    // Corresponding opaque-LSA
     ASBRrte *rte;   // Associated routing table entry
-    ASBRhdr *asbr;  // Destination ASBR information
+    ASBRhdr asbr;  // Destination ASBR information
     overlayAsbrLSA *link;   // Link together
 public:
     overlayAsbrLSA(class opqLSA *, ASBRhdr *asbr);
     ~overlayAsbrLSA();
     friend class OSPF;
     friend class opqLSA;
+    friend class ASBRrte;
 };
     
     

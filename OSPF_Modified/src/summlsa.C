@@ -160,11 +160,11 @@ uns32 SpfArea::sl_cost(INrte *rte)
     else if (rte->type() != RT_SPF)
 	return(LSInfinity);
     //TODO attention here (restrictions)
-    else if (rte->r_mpath->all_in_area(this))
+    /*else if (rte->r_mpath->all_in_area(this))
 	return(LSInfinity);
     else if ((!a_transit || rte->area() != BACKBONE) &&
 	     rte->within_range())
-	return(LSInfinity);
+	return(LSInfinity);*/
     else {
 	home = rte->area();
 	cost = rte->cost;
@@ -335,9 +335,7 @@ void INrte::run_inter_area()
 
     new_type = RT_NONE;
     best_path = 0;
-    if (r_type == RT_SPF)
-        cost = this->cost;
-    else
+    if (r_type != RT_SPF)
         cost = LSInfinity;
     summ_ap = ospf->SummaryArea();
     // Go through list of summary-LSAs
@@ -362,8 +360,8 @@ void INrte::run_inter_area()
             continue;
         // Compare cost to current best
         new_cost = lsap->adv_cost + rtr->cost;
-        if (new_type != RT_NONE ) {
-            if (cost < new_cost)
+        if (new_type != RT_NONE || r_type == RT_SPF) { 
+            if (cost <= new_cost)
                 continue;
             if (new_cost < cost)
                 best_path = 0;
@@ -373,6 +371,10 @@ void INrte::run_inter_area()
         new_type = RT_SPFIA;
         best_path = MPath::merge(best_path, rtr->r_mpath);
     }
+
+    // Intra-area path is best
+    if (new_type == RT_NONE && r_type == RT_SPF)
+        return;
 
     // Delete old inter-area route?
     if (new_type == RT_NONE &&

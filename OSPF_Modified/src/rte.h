@@ -119,6 +119,9 @@ class RTE : public AVLitem {
     uns32 t2cost;	// Type 2 cost of entry
     bool adv_overlay;   // This entry should be advertised in the ABR overlay
     bool has_been_adv;  // This entry has already been advertised by an ABR?
+    bool has_intra_path;    // Reachable through an intra area path
+    uns32 intra_cost;       // Shortest intra-area path cost
+    // bool waiting_for_summ;  // We are waiting for a Summary-LSA from a neighbor ABR to correctly update this route
 
     RTE(uns32 key_a, uns32 key_b);
     void new_intra(TNode *V, bool stub, uns16 stub_cost, int index);
@@ -357,6 +360,22 @@ inline uns32 ASBRrte::rtrid()
 inline ASBRrte *ASBRrte::next()
 {
     return(sll);
+}
+
+/* ABR routing table entries
+ */
+
+class ABRrte : public RTE {
+    public:
+        ABRrte(uns32 rtrid);
+        inline uns32 rtrid();
+        friend class OSPF;
+};
+
+// Inline functions
+inline uns32 ABRrte::rtrid()
+{
+    return(index1());
 }
 
 /* Forwarding addresses are in a separate table.

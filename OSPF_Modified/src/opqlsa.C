@@ -57,9 +57,9 @@ void opqLSA::parse(LShdr *hdr)
     
     if (ospf->n_area > 1 &&
         lsa_type == LST_AS_OPQ && 
-            ((ls_id()>>24) == OPQ_T_MULTI_ABR || 
-             (ls_id()>>24) == OPQ_T_MULTI_PREFIX ||
-             (ls_id()>>24) == OPQ_T_MULTI_ASBR))
+            ((ls_id()>>24) == ((OPQ_T_MULTI_ABR<<24)>>24) || 
+             (ls_id()>>24) == ((OPQ_T_MULTI_PREFIX<<24)>>24) ||
+             (ls_id()>>24) == ((OPQ_T_MULTI_ASBR<<24)>>24)))
         parse_overlay_lsa(hdr);
 }
 
@@ -75,9 +75,9 @@ void opqLSA::unparse()
 
     if (ospf->n_area > 1 &&
         lsa_type == LST_AS_OPQ && 
-            ((ls_id()>>24) == OPQ_T_MULTI_ABR || 
-             (ls_id()>>24) == OPQ_T_MULTI_PREFIX ||
-             (ls_id()>>24) == OPQ_T_MULTI_ASBR))
+            ((ls_id()>>24) == ((OPQ_T_MULTI_ABR<<24)>>24) || 
+             (ls_id()>>24) == ((OPQ_T_MULTI_PREFIX<<24)>>24) ||
+             (ls_id()>>24) == ((OPQ_T_MULTI_ASBR<<24)>>24)))
         unparse_overlay_lsa();
 }
 
@@ -138,7 +138,7 @@ void OSPF::opq_orig(SpfIfc *ip, SpfArea *ap, byte lstype, lsid_t ls_id,
 	LSA *nlsap;
 	// Fill in LSA header
         hdr = ospf->orig_buffer(maxlen);
-	hdr->ls_opts = SPO_DC;
+	hdr->ls_opts = SPO_DC | SPO_OPQ;
 	if (ap && !ap->a_stub)
 	    hdr->ls_opts |= SPO_EXT;
 	hdr->ls_type = lstype;
