@@ -121,7 +121,6 @@ class RTE : public AVLitem {
     bool has_been_adv;  // This entry has already been advertised by an ABR?
     bool has_intra_path;    // Reachable through an intra area path
     uns32 intra_cost;       // Shortest intra-area path cost
-    // bool waiting_for_summ;  // We are waiting for a Summary-LSA from a neighbor ABR to correctly update this route
 
     RTE(uns32 key_a, uns32 key_b);
     void new_intra(TNode *V, bool stub, uns16 stub_cost, int index);
@@ -146,6 +145,7 @@ class RTE : public AVLitem {
     friend class summLSA;
     friend class FWDrte;
     friend class opqLSA;
+    friend class OSPF;
 };
 
 // Inline functions

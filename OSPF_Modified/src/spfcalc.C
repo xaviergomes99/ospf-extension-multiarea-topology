@@ -287,7 +287,6 @@ RTE::RTE(uns32 key_a, uns32 key_b) : AVLitem(key_a, key_b)
 	has_been_adv = false;
 	has_intra_path = false;
 	intra_cost = LSInfinity;
-	// waiting_for_summ = false;
 }
 
 /* There is a newly discovered intra-area route to a transit

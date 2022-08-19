@@ -16,8 +16,11 @@ void OSPF::overlay_calc()
         calc_overlay = false;
         // Run the Dijkstra calculation for the ABR overlay
         overlay_dijkstra();
+        // Set the next (ABR) hop to each of the ABRs on the overlay
+        set_overlay_nh();
         // Scan the present Prefix-LSAs and ASBR-LSAs
         prefix_scan();
+        fa_tbl->resolve();
     }
 }
 
@@ -40,7 +43,7 @@ void OSPF::overlay_dijkstra()
     for (; abr; abr = (overlayAbrLSA *) abr->sll) {
         // Initialize the overlay Dijkstra calculation, 
         // by adding our ABR-LSA to the candidate list
-        if (abr->lsa->adv_rtr() == my_id()) {
+        if (abr == my_abr_lsa) {
             abr->cost0 = 0;
             abr->cost1 = 0;
             cand.priq_add(abr);
@@ -49,6 +52,7 @@ void OSPF::overlay_dijkstra()
         else {
             abr->t_state = DS_UNINIT;
             abr->cost0 = Infinity;
+            abr->t_parent = 0;
         }
     }
 
@@ -84,7 +88,39 @@ void OSPF::overlay_dijkstra()
                     abr_nbr->tie1 = 0;
                     cand.priq_add(abr_nbr);
                     abr_nbr->t_state = DS_ONCAND;
+                    abr_nbr->t_parent = abr;
                 }
+            }
+        }
+    }
+}
+
+/* We go through all the ABRs known to us and determine the next ABR step
+ * needed to reach each of them. This is done by tracing back the parent
+ * nodes set during the overlay Dijkstra calculation up to the last parent
+ * node before our own ABR.
+ */
+
+void OSPF::set_overlay_nh()
+
+{
+    overlayAbrLSA *abr, *parent;
+
+    abr = (overlayAbrLSA *) abrLSAs.sllhead;
+    for (; abr; abr = (overlayAbrLSA *) abr->sll) {
+        if (abr->t_state == DS_ONTREE) {
+            // Skip our own ABR
+            if (abr->t_parent == 0)
+                continue;
+            // ABR neighbors are their own next ABR hop
+            else if (abr->t_parent == my_abr_lsa)
+                abr->next_abr_hop = abr;
+            // More distant ABRs
+            else {
+                parent = abr->t_parent;
+                while (parent->t_parent != my_abr_lsa)
+                    parent = parent->t_parent;
+                abr->next_abr_hop = parent;
             }
         }
     }
@@ -104,12 +140,11 @@ void OSPF::prefix_scan()
     INiterator iter(inrttbl);
     overlayPrefixLSA *pref;
     overlayAsbrLSA *asbr;
-    overlayAbrLSA *abr;
+    overlayAbrLSA *abr, *best_abr;
     ASBRrte *rrte;
     uns32 cost, best_cost;
     bool found = false;
-    // rtid_t rid;
-    
+
     // Go through all the Prefix-LSAs associated to each INrte
     while ((rte = iter.nextrte())) {
         if (rte->prefixes) {
@@ -120,18 +155,16 @@ void OSPF::prefix_scan()
                     cost = abr->cost + pref->prefix.metric;
                     if (cost < best_cost) {
                         best_cost = cost;
-                        // rid = abr->index1();
+                        best_abr = abr;
                     }
                 }
             }
             // Assign the best cost to the routing table entry and
             // generate the corresponding Summ-LSA, if the cost has changed
             if (found && (rte->cost != best_cost || !rte->has_been_adv)) {
-                rte->cost = best_cost;
+                update_path_overlay(rte, best_abr, best_cost);
                 rte->has_been_adv = true;
                 sl_orig(rte);
-                // if (rid != my_id())
-                //     rte->waiting_for_summ = true;
             }
         }
     }
@@ -146,18 +179,55 @@ void OSPF::prefix_scan()
                 if ((abr = (overlayAbrLSA *) abrLSAs.find(asbr->index1()))) {
                     found = true;
                     cost = abr->cost + asbr->asbr.metric;
-                    if (cost < best_cost)
+                    if (cost < best_cost) {
                         best_cost = cost;
+                        best_abr = abr;
+                    }
                 } 
             }
             // Assign the best cost to the routing table entry and
             // generate the corresponding Summ-LSA, if the cost has changed
-            if (found && (asbr->rte->cost != best_cost || !asbr->rte->has_been_adv)) {
-                asbr->rte->cost = best_cost;
-                asbr->rte->has_been_adv = true;
-                asbr_orig(asbr->rte);
-                rte->run_inter_area();
+            if (found && (rrte->cost != best_cost || !rrte->has_been_adv)) {
+                update_path_overlay(rrte, best_abr, best_cost);
+                rrte->has_been_adv = true;
+                asbr_orig(rrte);
             }
         } 
     }
+}
+
+/* Update our path to an inter-area destination, we get the new best cost
+ * to a destination and the ABR advertising it, and determine the new next-hop
+ * to reach that destination.
+ */
+
+void OSPF::update_path_overlay(RTE *rte, overlayAbrLSA *abr, uns32 cost)
+
+{
+    rtid_t next_abr;
+    ABRNbr *nbr;
+    MPath *path;
+    RTE *rtr;
+    AVLsearch iter(&added_nbrs);
+
+    // We are using our advertised cost (our best intra-area path)
+    if (abr == my_abr_lsa)
+        return;
+
+    // Gather all the necessary information in order to update the entry
+    next_abr = abr->next_abr_hop->index1();
+    path = 0;
+    while (nbr = (ABRNbr *) iter.next()) {
+        if (nbr->get_rid() == next_abr)
+            break;
+    }
+    rtr = nbr->rtr->t_dest;
+
+    // Update the entry with the new cost and path
+    rte->cost = cost;
+    rte->r_type = RT_SPFIA;
+    path = MPath::merge(path, rtr->r_mpath);
+    rte->update(path);
+
+    printf("RTE %d COST %d\n", rte->index1(), rte->cost);
 }

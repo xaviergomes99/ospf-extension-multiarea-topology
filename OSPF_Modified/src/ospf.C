@@ -130,6 +130,7 @@ OSPF::OSPF(uns32 rtid, SPFtime grace) : myid(rtid)
     send_all_prefixes = false;
     calc_overlay = false;
     asbr_seq = 0;
+    my_abr_lsa = 0;
 
     // Initialize logging
     logno = 0;

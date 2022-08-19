@@ -489,23 +489,24 @@ void rtrLSA::parse(LShdr *hdr)
     rtype = rhdr->rtype;
 	orig_rtr = ntoh32(hdr->ls_org);
 
+    t_dest = lsa_ap->add_abr(ls_id());
+
 	// If this router is an ABR, update our stored info accordingly
 	if (ospf->n_area > 1) {
 		// Only create instance of ABRNbr if the router is an ABR
 		if ((rtype == RTYPE_B) && (orig_rtr != ospf->my_id())) {
 			// New neighboring ABR
 			if (abr == 0) { 
-				abr = new ABRNbr(orig_rtr, this, area());
+				abr = new ABRNbr(this, area());
 			}
 			// There is a link to a ABRNbr created, but it is wrong
 			else if ((abr->get_rid() != orig_rtr) || (abr->get_rtrLSA() != this)) {
 				abr->remove_abr_nb();
-				abr = new ABRNbr(orig_rtr, this, area());
+				abr = new ABRNbr(this, area());
 			}
 		}
 	}
 
-    t_dest = lsa_ap->add_abr(ls_id());
     // Virtual link address calculation might change
     t_dest->changed = true;
     if (rhdr->zero != 0)

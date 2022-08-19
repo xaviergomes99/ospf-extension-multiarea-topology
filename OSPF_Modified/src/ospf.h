@@ -175,6 +175,7 @@ class OSPF : public ConfigItem {
     bool send_all_prefixes; // Advertise all the current prefixes and ASBRs in the overlay
     bool calc_overlay;  // Perform the complete overlay topology calculations
     int asbr_seq;   // Next value for the opaque-ID to be assigned to a ASBR-LSA
+    overlayAbrLSA *my_abr_lsa;    // Our own ABR-LSA
     AVLtree ABRNbrs;    // List of all our neighboring ABRs
     AVLtree added_nbrs; // List of the currently added neighbors
     AVLtree abrLSAs;    // List of all ABR-LSAs
@@ -332,7 +333,9 @@ class OSPF : public ConfigItem {
 
     void overlay_calc();
     void overlay_dijkstra();
+    void set_overlay_nh();
     void prefix_scan();
+    void update_path_overlay(RTE *, overlayAbrLSA *, uns32 c);
 
     ABRrte *add_abr(uns32 rtrid);
 

@@ -12,7 +12,7 @@ class ABRNbr : public AVLitem {
     rtrLSA *rtr;    // Link to corresponding Router-LSA
     SpfArea *area;  // Area in which we are neighbors with the ABR
 public:
-    ABRNbr(rtid_t id, rtrLSA *lsa, SpfArea *a);
+    ABRNbr(rtrLSA *lsa, SpfArea *a);
     virtual ~ABRNbr();
 
     inline rtid_t get_rid();

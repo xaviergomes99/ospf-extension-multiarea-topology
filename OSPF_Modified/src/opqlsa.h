@@ -73,6 +73,8 @@ class overlayAbrLSA : public PriQElt, public AVLitem {
     uns32 cost;     // Cost to the ABR
     byte overlay_dijk_run:1;    // Overlay Dijkstra run
     byte t_state;   // Current state of this ABR, in the dijkstra calc
+    overlayAbrLSA *t_parent;    // Parent on the SPF Tree
+    overlayAbrLSA *next_abr_hop;    // First ABR hop to this ABR
     // ABRhdr *nbrs;   // Neighbors described in the LSA
     int n_nbrs;     // Number of neighbors described
 public:

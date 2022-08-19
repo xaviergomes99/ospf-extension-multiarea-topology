@@ -24,6 +24,8 @@ overlayAbrLSA::overlayAbrLSA(opqLSA *opq)
     opq->abrLSA = this;
     cost = LSInfinity;
     ospf->abrLSAs.add(this);
+    t_parent = 0;
+    next_abr_hop = 0;
 }
 
 /* Destructor for the ABR-LSA
@@ -82,11 +84,12 @@ overlayAsbrLSA::~overlayAsbrLSA()
  * costs to the same ABR.
  */
 
-ABRNbr::ABRNbr(rtid_t id, rtrLSA *lsa, SpfArea *a) : AVLitem(id, a->id()) {
-    rid = id;
+ABRNbr::ABRNbr(rtrLSA *lsa, SpfArea *a) : AVLitem(lsa->adv_rtr(), a->id()) {
+    rid = lsa->adv_rtr();
     rtr = lsa;
     cost = LSInfinity;
     area = a;
+    rtr->abr = this;
     ospf->ABRNbrs.add(this);
 }
 
@@ -146,7 +149,7 @@ void OSPF::orig_abrLSA() {
     int blen;
     lsid_t lsid;
     uns32 cost;
-    uns32 rid;
+    bool found;
 
     abr_changed = false;
     added_nbrs.clear();
@@ -156,23 +159,25 @@ void OSPF::orig_abrLSA() {
     // Iterate through all ABR neighbor entries
     while ((abrNbr = (ABRNbr *) iter.next())) {
         cost = abrNbr->cost;
-        rid = abrNbr->rid;
         // Cost is assigned, so we add to the LSA
         if (cost < LSInfinity) {
-            // Entry already added
-            if ((abr = (ABRNbr *) added_nbrs.find(rid))) {
-                // Make sure it returns the correct one
-                if (abr->get_rid() == rid) {
-                    // There is an entry for this ABR with a lower or equal cost
-                    if (abr->get_cost() <= cost)
-                        continue;
-                    // There is a better entry for an ABR already being advertised
-                    else
+            AVLsearch iiter(&added_nbrs);
+            found = false;
+            while (abr = (ABRNbr *) iiter.next()) {
+                // There is already an entry for this ABR
+                if (abr->get_rid() == abrNbr->rid) {
+                    found = true;
+                    // There is an entry for this ABR with a lower cost
+                    if (abr->get_cost() > cost) {
                         added_nbrs.remove(abr);
+                        added_nbrs.add(abrNbr);
+                    }
+                    break;
                 }
             }
             // New neighbor
-            added_nbrs.add(abrNbr);
+            if (!found)
+                added_nbrs.add(abrNbr);
         }
     }
 
@@ -275,18 +280,21 @@ void opqLSA::parse_overlay_lsa(LShdr *hdr) {
 
         this->abrLSA = abrLSA;
         abrLSA->n_nbrs = (ntoh16(hdr->ls_length) - sizeof(LShdr))/sizeof(ABRhdr);
+
+        if (adv_rtr() == ospf->my_id())
+            ospf->my_abr_lsa = abrLSA;
     }
     // Prefix-LSA
     else if ((ls_id()>>24) == OPQ_T_MULTI_PREFIX) {
         overlayPrefixLSA *prefLSA, *pref;
         Prefixhdr *prefhdr;
-        //bool new_pref = false;
+        bool new_pref = false;
 
         prefhdr = (Prefixhdr *) (hdr+1);
 
         if (!(prefLSA = (overlayPrefixLSA *) ospf->prefixLSAs.find(adv_rtr(), (prefhdr->subnet_addr & prefhdr->subnet_mask)))) {
             prefLSA = new overlayPrefixLSA(this, prefhdr);
-            //new_pref = true;
+            new_pref = true;
         }
 
         this->prefixLSA = prefLSA;
@@ -297,36 +305,34 @@ void opqLSA::parse_overlay_lsa(LShdr *hdr) {
         prefLSA->prefix = *prefhdr;
 
         // Link this prefix-LSA to the list of prefix-LSAs associated to this prefix
-        //if (new_pref) {
+        if (new_pref) {
             prefLSA->link = prefLSA->rte->prefixes;
             prefLSA->rte->prefixes = prefLSA;
-        //}
+        }
         
         // Originate the corresponding summ-LSA, if there isn't a 
         // full overlay calculation scheduled
         if (ospf->first_abrLSA_sent && !ospf->calc_overlay && (ospf->n_overlay_dijkstras > 0)) {
             uns32 best_cost = LSInfinity, cost;
             bool found = false;
-            overlayAbrLSA *abr;
-            // rtid_t rid;
+            overlayAbrLSA *abr, *best_abr;
             for (pref = prefLSA->rte->prefixes; pref; pref = (overlayPrefixLSA *) pref->link) {
                 if ((abr = (overlayAbrLSA *) ospf->abrLSAs.find(pref->index1()))) {
                     found = true;
                     cost = abr->cost + pref->prefix.metric;
                     if (cost < best_cost) {
                         best_cost = cost;
-                        // rid = abr->index1();
+                        best_abr = abr;
                     }
                 }
             }
             // Assign the best cost to the routing table entry and
             // generate the corresponding Summ-LSA, if the cost has changed
             if (found && (prefLSA->rte->cost != best_cost || !prefLSA->rte->has_been_adv)) {
-                prefLSA->rte->cost = best_cost;
+                ospf->update_path_overlay(prefLSA->rte, best_abr, best_cost);
                 prefLSA->rte->has_been_adv = true;
                 ospf->sl_orig(prefLSA->rte);
-                // if (rid != ospf->my_id())
-                //     prefLSA->rte->waiting_for_summ = true;
+                fa_tbl->resolve();
             }
         }
     }
@@ -334,11 +340,13 @@ void opqLSA::parse_overlay_lsa(LShdr *hdr) {
     else if ((ls_id()>>24) == OPQ_T_MULTI_ASBR) {
         overlayAsbrLSA *asbrLSA, *asbr;
         ASBRhdr *asbrhdr;
+        bool new_asbr = false;
 
         asbrhdr = (ASBRhdr *) (hdr+1);
 
         if (!(asbrLSA = (overlayAsbrLSA *) ospf->asbrLSAs.find(adv_rtr(), asbrhdr->dest_rid))) {
             asbrLSA = new overlayAsbrLSA(this, asbrhdr);
+            new_asbr = true;
         }
 
         this->asbrLSA = asbrLSA;
@@ -348,34 +356,34 @@ void opqLSA::parse_overlay_lsa(LShdr *hdr) {
             asbrLSA->rte->r_type = RT_SPFIA;
         asbrLSA->asbr = *asbrhdr;
 
-        asbrLSA->link = asbrLSA->rte->asbr_lsas;
-        asbrLSA->rte->asbr_lsas = asbrLSA;
+        if (new_asbr) {
+            asbrLSA->link = asbrLSA->rte->asbr_lsas;
+            asbrLSA->rte->asbr_lsas = asbrLSA;
+        } 
 
         // Originate the corresponding ASBR-Summ-LSA, if there isn't a 
         // full overlay calculation scheduled
         if (ospf->first_abrLSA_sent && !ospf->calc_overlay && (ospf->n_overlay_dijkstras > 0)) {
             uns32 best_cost = LSInfinity, cost;
             bool found = false;
-            overlayAbrLSA *abr;
-            // rtid_t rid;
+            overlayAbrLSA *abr, *best_abr;
             for (asbr = asbrLSA->rte->asbr_lsas; asbr; asbr = (overlayAsbrLSA *) asbr->link) {
                 if ((abr = (overlayAbrLSA *) ospf->abrLSAs.find(asbr->index1()))) {
                     found = true;
                     cost = abr->cost + asbr->asbr.metric;
                     if (cost < best_cost) {
                         best_cost = cost;
-                        // rid = abr->index1();
+                        best_abr = abr;
                     }
                 }
             }
             // Assign the best cost to the routing table entry and
             // generate the corresponding ASBR-Summ-LSA, if the cost has changed
             if (found && (asbrLSA->rte->cost != best_cost || !asbrLSA->rte->has_been_adv)) {
-                asbrLSA->rte->cost = best_cost;
+                ospf->update_path_overlay(asbrLSA->rte, best_abr, best_cost);
                 asbrLSA->rte->has_been_adv = true;
                 ospf->asbr_orig(asbrLSA->rte);
-                // if (rid != ospf->my_id())
-                //     asbrLSA->rte->waiting_for_summ = true;
+                fa_tbl->resolve();
             }
         }
     }
@@ -393,9 +401,6 @@ void opqLSA::unparse_overlay_lsa() {
     }
     // Prefix-LSA
     else if ((ls_id()>>24) == OPQ_T_MULTI_PREFIX) {
-        prefixLSA->rte = 0;
-        prefixLSA = 0;
-
         overlayPrefixLSA *ptr, *pref = prefixLSA;
         overlayPrefixLSA **prev;
 
@@ -409,12 +414,12 @@ void opqLSA::unparse_overlay_lsa() {
 	            break;
 	        }
         }
+
+        prefixLSA->rte = 0;
+        prefixLSA = 0;
     }
     // ASBR-LSA
     else if ((ls_id()>>24) == OPQ_T_MULTI_ASBR) {
-        asbrLSA->rte = 0;
-        asbrLSA = 0;
-        
         overlayAsbrLSA *ptr, *asbr = asbrLSA;
         overlayAsbrLSA **prev;
 
@@ -428,5 +433,8 @@ void opqLSA::unparse_overlay_lsa() {
                 break;
             }
         }
+
+        asbrLSA->rte = 0;
+        asbrLSA = 0;
     }
 }
