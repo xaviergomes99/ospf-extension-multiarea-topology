@@ -636,6 +636,8 @@ void rtrLSA::unparse()
 
 {
     unlink();
+	if (abr)
+		abr->remove_abr_nb();
 }
 
 /* Unlink a transit node (router or network-LSA) from its

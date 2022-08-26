@@ -51,7 +51,6 @@ void OSPF::overlay_dijkstra()
         }
         else {
             abr->t_state = DS_UNINIT;
-            abr->cost0 = Infinity;
             abr->t_parent = 0;
         }
     }
@@ -70,7 +69,7 @@ void OSPF::overlay_dijkstra()
         // Scan neighboring ABRs
         nbr = (ABRhdr *) abr->lsa->lsa_body;
         for (i = 0; i < abr->n_nbrs; nbr++, i++) {
-            abr_nbr = (overlayAbrLSA *) abrLSAs.find(nbr->neigh_rid);
+            abr_nbr = (overlayAbrLSA *) abrLSAs.find(hton32(nbr->neigh_rid));
             if (abr_nbr) {
                 if (abr_nbr->t_state == DS_ONTREE)
                     continue;
@@ -138,61 +137,16 @@ void OSPF::prefix_scan()
 {
     INrte *rte;
     INiterator iter(inrttbl);
-    overlayPrefixLSA *pref;
-    overlayAsbrLSA *asbr;
-    overlayAbrLSA *abr, *best_abr;
     ASBRrte *rrte;
-    uns32 cost, best_cost;
-    bool found = false;
 
     // Go through all the Prefix-LSAs associated to each INrte
     while ((rte = iter.nextrte())) {
-        if (rte->prefixes) {
-            best_cost = LSInfinity;
-            for (pref = rte->prefixes; pref; pref = (overlayPrefixLSA *) pref->link) {
-                if ((abr = (overlayAbrLSA *) abrLSAs.find(pref->index1()))) {
-                    found = true;
-                    cost = abr->cost + pref->prefix.metric;
-                    if (cost < best_cost) {
-                        best_cost = cost;
-                        best_abr = abr;
-                    }
-                }
-            }
-            // Assign the best cost to the routing table entry and
-            // generate the corresponding Summ-LSA, if the cost has changed
-            if (found && (rte->cost != best_cost || !rte->has_been_adv)) {
-                update_path_overlay(rte, best_abr, best_cost);
-                rte->has_been_adv = true;
-                sl_orig(rte);
-            }
-        }
+        adv_best_prefix(rte);
     }
-
-    found = false;
 
     // Then go through the all the ASBR-LSAs for each of the ASBRs known
     for (rrte = ASBRs; rrte; rrte = rrte->next()) {
-        if (rrte->asbr_lsas) {
-            best_cost = LSInfinity;
-            for (asbr = rrte->asbr_lsas; asbr; asbr = (overlayAsbrLSA *) asbr->link) {
-                if ((abr = (overlayAbrLSA *) abrLSAs.find(asbr->index1()))) {
-                    found = true;
-                    cost = abr->cost + asbr->asbr.metric;
-                    if (cost < best_cost) {
-                        best_cost = cost;
-                        best_abr = abr;
-                    }
-                } 
-            }
-            // Assign the best cost to the routing table entry and
-            // generate the corresponding Summ-LSA, if the cost has changed
-            if (found && (rrte->cost != best_cost || !rrte->has_been_adv)) {
-                update_path_overlay(rrte, best_abr, best_cost);
-                rrte->has_been_adv = true;
-                asbr_orig(rrte);
-            }
-        } 
+         adv_best_asbr(rrte);
     }
 }
 
@@ -206,28 +160,106 @@ void OSPF::update_path_overlay(RTE *rte, overlayAbrLSA *abr, uns32 cost)
 {
     rtid_t next_abr;
     ABRNbr *nbr;
-    MPath *path;
     RTE *rtr;
-    AVLsearch iter(&added_nbrs);
 
     // We are using our advertised cost (our best intra-area path)
-    if (abr == my_abr_lsa)
-        return;
+    if (abr == my_abr_lsa) {
+        // We are already using the intra-area path to this destination
+        if (rte->type() == RT_SPF)
+            return;
+        else {
+            printf("Using my ABR, changing cost and path to intra_area\n");
+            rte->cost = rte->intra_cost;
+            rte->r_type = RT_SPF;
+            rte->update(rte->intra_path);
+            return;
+        }
+    }
 
     // Gather all the necessary information in order to update the entry
     next_abr = abr->next_abr_hop->index1();
-    path = 0;
-    while (nbr = (ABRNbr *) iter.next()) {
+    nbr = (ABRNbr *) added_nbrs.sllhead;
+    for (; nbr; nbr = (ABRNbr *) nbr->sll) {
         if (nbr->get_rid() == next_abr)
             break;
     }
+    // BUG HERE
     rtr = nbr->rtr->t_dest;
 
     // Update the entry with the new cost and path
     rte->cost = cost;
     rte->r_type = RT_SPFIA;
-    path = MPath::merge(path, rtr->r_mpath);
-    rte->update(path);
+    rte->update(rtr->r_mpath);
+}
 
-    printf("RTE %d COST %d\n", rte->index1(), rte->cost);
+/* Determine the best Prefix-LSA for a given destination, update our own 
+ * routing table to it and advertise the corresponding Summ-LSA.
+ */
+
+void OSPF::adv_best_prefix(INrte *rte)
+
+{
+    overlayPrefixLSA *pref, *in_use;
+    overlayAbrLSA *abr, *best_abr;
+    uns32 cost, best_cost;
+    bool found;
+
+    if (rte->prefixes) {
+        found = false;
+        best_cost = LSInfinity;
+        for (pref = rte->prefixes; pref; pref = (overlayPrefixLSA *) pref->link) {
+            if ((abr = (overlayAbrLSA *) abrLSAs.find(pref->index1()))) {
+                found = true;
+                cost = abr->cost + pref->prefix.metric;
+                if (cost < best_cost) {
+                    best_cost = cost;
+                    best_abr = abr;
+                    in_use = pref;
+                }
+            }
+        }
+        // Assign the best cost to the routing table entry and
+        // generate the corresponding Summ-LSA, if the cost has changed
+        if (found && (rte->cost != best_cost || !rte->has_been_adv)) {
+            update_path_overlay(rte, best_abr, best_cost);
+            rte->has_been_adv = true;
+            rte->in_use = in_use;
+            sl_orig(rte);
+        }
+    }
+}
+
+/* Determine the best ASBR-LSA for a given destination, update our own 
+ * routing table to it and advertise the corresponding ASBR-Summ-LSA.
+ */
+
+void OSPF::adv_best_asbr(ASBRrte *rte)
+
+{
+    overlayAsbrLSA *asbr;
+    overlayAbrLSA *abr, *best_abr;
+    uns32 cost, best_cost;
+    bool found;
+
+    if (rte->asbr_lsas) {
+        found = false;
+        best_cost = LSInfinity;
+        for (asbr = rte->asbr_lsas; asbr; asbr = (overlayAsbrLSA *) asbr->link) {
+            if ((abr = (overlayAbrLSA *) abrLSAs.find(asbr->index1()))) {
+                found = true;
+                cost = abr->cost + asbr->asbr.metric;
+                if (cost < best_cost) {
+                    best_cost = cost;
+                    best_abr = abr;
+                }
+            } 
+        }
+        // Assign the best cost to the routing table entry and
+        // generate the corresponding Summ-LSA, if the cost has changed
+        if (found && (rte->cost != best_cost || !rte->has_been_adv)) {
+            update_path_overlay(rte, best_abr, best_cost);
+            rte->has_been_adv = true;
+            asbr_orig(rte);
+        }
+    }
 }

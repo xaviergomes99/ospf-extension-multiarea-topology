@@ -4,6 +4,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update -y \
 && apt-get -y install gcc \
+gdb \
 build-essential \
 tcl-dev \
 traceroute \

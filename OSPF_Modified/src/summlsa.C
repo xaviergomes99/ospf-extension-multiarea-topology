@@ -159,7 +159,6 @@ uns32 SpfArea::sl_cost(INrte *rte)
     }
     else if (rte->type() != RT_SPF)
 	return(LSInfinity);
-    //TODO attention here (restrictions)
     /*else if (rte->r_mpath->all_in_area(this))
 	return(LSInfinity);
     else if ((!a_transit || rte->area() != BACKBONE) &&

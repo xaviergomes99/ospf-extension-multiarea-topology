@@ -55,6 +55,7 @@ public:
     SpfNbr *grace_lsa_parse(byte *, int, int &);
     friend class OSPF;
     friend class INrte;
+    friend class ABRNbr;
 };
 
 /* Holding queue for Opaque-LSAs that are to be delivered
@@ -82,6 +83,7 @@ public:
     ~overlayAbrLSA();
     friend class OSPF;
     friend class opqLSA;
+    friend class ABRNbr;
 };
 
 class overlayPrefixLSA : public AVLitem {

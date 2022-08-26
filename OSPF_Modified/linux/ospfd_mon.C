@@ -475,7 +475,7 @@ void get_database(byte lstype)
 	m = (MonMsg *) mhdr;
 	if (m->hdr.retcode != 0)
 	    break;
-	if (a_id != ntoh32(m->body.lsarq.area_id))
+	if ((a_id != ntoh32(m->body.lsarq.area_id)) && (lstype != LST_AS_OPQ))
 	    break;
 	new_lstype = ntoh32(m->body.lsarq.ls_type);
 	if (new_lstype != lstype) {

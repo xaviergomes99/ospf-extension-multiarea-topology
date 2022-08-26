@@ -336,6 +336,8 @@ class OSPF : public ConfigItem {
     void set_overlay_nh();
     void prefix_scan();
     void update_path_overlay(RTE *, overlayAbrLSA *, uns32 c);
+    void adv_best_prefix(INrte *);
+    void adv_best_asbr(ASBRrte *);
 
     ABRrte *add_abr(uns32 rtrid);
 

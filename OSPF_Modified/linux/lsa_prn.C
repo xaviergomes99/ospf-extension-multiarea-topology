@@ -323,9 +323,10 @@ void print_opq_lsa(byte *body, int len)
 void print_opq_lsa(byte *body, int len, lsid_t opq_type)
 
 {
-    lsid_t type = (opq_type >> 24);
+    lsid_t type = (opq_type << 24) >> 24;
+    printf("Type %d - Prefix %d\n", type, OPQ_T_MULTI_PREFIX);
     // ABR-LSA
-    if (type == OPQ_T_MULTI_ABR >> 24) {
+    if (type == OPQ_T_MULTI_ABR) {
         ABRhdr *abr;
         byte *end;
         int	i;
@@ -344,7 +345,7 @@ void print_opq_lsa(byte *body, int len, lsid_t opq_type)
             printf("\tIntra-area cost to neighbor:\t%d\n\n", abr->metric);
         }
     }
-    else if (type == OPQ_T_MULTI_PREFIX >> 24) {
+    else if (type == OPQ_T_MULTI_PREFIX) {
         Prefixhdr *prefix;
         in_addr in;
 

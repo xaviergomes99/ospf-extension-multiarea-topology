@@ -96,10 +96,7 @@ ABRNbr::ABRNbr(rtrLSA *lsa, SpfArea *a) : AVLitem(lsa->adv_rtr(), a->id()) {
 /* Destructor for the ABRNbr class
  */
 
-ABRNbr::~ABRNbr() {
-    ospf->ABRNbrs.remove(this);
-    rtr->abr = 0;
-}
+ABRNbr::~ABRNbr() {}
 
 /* We remove this neighbor ABR from our list of ABR overlay neighbors.
  * Also, we remove the link to this ABRNbr instance from the
@@ -109,6 +106,15 @@ ABRNbr::~ABRNbr() {
 void ABRNbr::remove_abr_nb() {
     ospf->ABRNbrs.remove(this);
     rtr->abr = 0;
+    rtr = 0;
+    area = 0;
+    ospf->abr_changed = true;
+    if (ospf->ABRNbrs.size() == 0 && ospf->my_abr_lsa) {
+        ospf->my_abr_lsa->lsa->adv_opq = false;
+        ospf->my_abr_lsa->lsa->reoriginate(false);
+        ospf->first_abrLSA_sent = false;
+        ospf->my_abr_lsa = 0;
+    }
 }
 
 /* Add an ABR to OSPF. If already added, return it. Otherwise
@@ -145,30 +151,36 @@ ABRrte *OSPF::add_abr(uns32 rtrid)
 void OSPF::orig_abrLSA() {
     ABRNbr *abrNbr, *abr;
     ABRhdr *body, curr, body_start;
-    AVLsearch iter(&ABRNbrs);
     int blen;
     lsid_t lsid;
     uns32 cost;
     bool found;
 
     abr_changed = false;
-    added_nbrs.clear();
     lsid = OPQ_T_MULTI_ABR << 24;
     body = &body_start;
 
+    //Clear the added_nbrs list manually since the AVLtree::clear() causes issues
+    if (added_nbrs.size() > 0) {
+        abr = (ABRNbr *) added_nbrs.sllhead;
+        for (; abr; abr = (ABRNbr *) abr->sll)
+            added_nbrs.remove(abr);
+    }
+
     // Iterate through all ABR neighbor entries
-    while ((abrNbr = (ABRNbr *) iter.next())) {
+    abrNbr = (ABRNbr *) ABRNbrs.sllhead;
+    for (; abrNbr; abrNbr = (ABRNbr *) abrNbr->sll) {
         cost = abrNbr->cost;
         // Cost is assigned, so we add to the LSA
         if (cost < LSInfinity) {
-            AVLsearch iiter(&added_nbrs);
             found = false;
-            while (abr = (ABRNbr *) iiter.next()) {
+            abr = (ABRNbr *) added_nbrs.sllhead;
+            for (; abr; abr = (ABRNbr *) abr->sll) {
                 // There is already an entry for this ABR
                 if (abr->get_rid() == abrNbr->rid) {
                     found = true;
                     // There is an entry for this ABR with a lower cost
-                    if (abr->get_cost() > cost) {
+                    if (abr->get_cost() >= cost) {
                         added_nbrs.remove(abr);
                         added_nbrs.add(abrNbr);
                     }
@@ -185,7 +197,7 @@ void OSPF::orig_abrLSA() {
     abrNbr = (ABRNbr *) added_nbrs.sllhead;
     for (; abrNbr; abrNbr = (ABRNbr *) abrNbr->sll) {
         curr.metric = abrNbr->cost;
-        curr.neigh_rid = abrNbr->rid;
+        curr.neigh_rid = ntoh32(abrNbr->rid);
         memcpy(body, &curr, sizeof(ABRhdr));
         body++;
     }
@@ -193,7 +205,11 @@ void OSPF::orig_abrLSA() {
     blen = added_nbrs.size() * sizeof(ABRhdr);
     if (blen > 0) {
         opq_orig(0, 0, LST_AS_OPQ, lsid, (byte *) &body_start, blen, true, 1);
-        if (!first_abrLSA_sent) {
+        // If we are updating our own ABR-LSA, do a complete overlay Dijkstra calculation
+        if (first_abrLSA_sent)
+            calc_overlay = true;
+        // This is the first ABR-LSA we are sending out
+        else {
             first_abrLSA_sent = true;
             send_all_prefixes = true;
         }
@@ -286,105 +302,54 @@ void opqLSA::parse_overlay_lsa(LShdr *hdr) {
     }
     // Prefix-LSA
     else if ((ls_id()>>24) == OPQ_T_MULTI_PREFIX) {
-        overlayPrefixLSA *prefLSA, *pref;
+        overlayPrefixLSA *prefLSA;
         Prefixhdr *prefhdr;
-        bool new_pref = false;
 
         prefhdr = (Prefixhdr *) (hdr+1);
 
         if (!(prefLSA = (overlayPrefixLSA *) ospf->prefixLSAs.find(adv_rtr(), (prefhdr->subnet_addr & prefhdr->subnet_mask)))) {
             prefLSA = new overlayPrefixLSA(this, prefhdr);
-            new_pref = true;
         }
 
         this->prefixLSA = prefLSA;
 
         prefLSA->rte = inrttbl->add(ntoh32(prefhdr->subnet_addr), ntoh32(prefhdr->subnet_mask));
-        if (!prefLSA->rte->has_intra_path && !(prefLSA->rte->type() == RT_DIRECT))
-            prefLSA->rte->r_type = RT_SPFIA;
         prefLSA->prefix = *prefhdr;
 
         // Link this prefix-LSA to the list of prefix-LSAs associated to this prefix
-        if (new_pref) {
-            prefLSA->link = prefLSA->rte->prefixes;
-            prefLSA->rte->prefixes = prefLSA;
-        }
-        
-        // Originate the corresponding summ-LSA, if there isn't a 
-        // full overlay calculation scheduled
-        if (ospf->first_abrLSA_sent && !ospf->calc_overlay && (ospf->n_overlay_dijkstras > 0)) {
-            uns32 best_cost = LSInfinity, cost;
-            bool found = false;
-            overlayAbrLSA *abr, *best_abr;
-            for (pref = prefLSA->rte->prefixes; pref; pref = (overlayPrefixLSA *) pref->link) {
-                if ((abr = (overlayAbrLSA *) ospf->abrLSAs.find(pref->index1()))) {
-                    found = true;
-                    cost = abr->cost + pref->prefix.metric;
-                    if (cost < best_cost) {
-                        best_cost = cost;
-                        best_abr = abr;
-                    }
-                }
-            }
-            // Assign the best cost to the routing table entry and
-            // generate the corresponding Summ-LSA, if the cost has changed
-            if (found && (prefLSA->rte->cost != best_cost || !prefLSA->rte->has_been_adv)) {
-                ospf->update_path_overlay(prefLSA->rte, best_abr, best_cost);
-                prefLSA->rte->has_been_adv = true;
-                ospf->sl_orig(prefLSA->rte);
-                fa_tbl->resolve();
-            }
+        prefLSA->link = prefLSA->rte->prefixes;
+        prefLSA->rte->prefixes = prefLSA;
+
+        // Originate the corresponding summ-LSA, if there isn't a full overlay calculation scheduled
+        if (ospf->first_abrLSA_sent && (ospf->n_overlay_dijkstras > 0)) {
+            ospf->adv_best_prefix(prefLSA->rte);
+            fa_tbl->resolve();
         }
     }
     // ASBR-LSA
     else if ((ls_id()>>24) == OPQ_T_MULTI_ASBR) {
-        overlayAsbrLSA *asbrLSA, *asbr;
+        overlayAsbrLSA *asbrLSA;
         ASBRhdr *asbrhdr;
-        bool new_asbr = false;
 
         asbrhdr = (ASBRhdr *) (hdr+1);
 
         if (!(asbrLSA = (overlayAsbrLSA *) ospf->asbrLSAs.find(adv_rtr(), asbrhdr->dest_rid))) {
             asbrLSA = new overlayAsbrLSA(this, asbrhdr);
-            new_asbr = true;
         }
 
         this->asbrLSA = asbrLSA;
 
         asbrLSA->rte = ospf->add_asbr(asbrhdr->dest_rid);
-        if (!asbrLSA->rte->has_intra_path && asbrLSA->rte->type() != RT_DIRECT)
-            asbrLSA->rte->r_type = RT_SPFIA;
         asbrLSA->asbr = *asbrhdr;
 
-        if (new_asbr) {
-            asbrLSA->link = asbrLSA->rte->asbr_lsas;
-            asbrLSA->rte->asbr_lsas = asbrLSA;
-        } 
+        asbrLSA->link = asbrLSA->rte->asbr_lsas;
+        asbrLSA->rte->asbr_lsas = asbrLSA;
 
         // Originate the corresponding ASBR-Summ-LSA, if there isn't a 
         // full overlay calculation scheduled
         if (ospf->first_abrLSA_sent && !ospf->calc_overlay && (ospf->n_overlay_dijkstras > 0)) {
-            uns32 best_cost = LSInfinity, cost;
-            bool found = false;
-            overlayAbrLSA *abr, *best_abr;
-            for (asbr = asbrLSA->rte->asbr_lsas; asbr; asbr = (overlayAsbrLSA *) asbr->link) {
-                if ((abr = (overlayAbrLSA *) ospf->abrLSAs.find(asbr->index1()))) {
-                    found = true;
-                    cost = abr->cost + asbr->asbr.metric;
-                    if (cost < best_cost) {
-                        best_cost = cost;
-                        best_abr = abr;
-                    }
-                }
-            }
-            // Assign the best cost to the routing table entry and
-            // generate the corresponding ASBR-Summ-LSA, if the cost has changed
-            if (found && (asbrLSA->rte->cost != best_cost || !asbrLSA->rte->has_been_adv)) {
-                ospf->update_path_overlay(asbrLSA->rte, best_abr, best_cost);
-                asbrLSA->rte->has_been_adv = true;
-                ospf->asbr_orig(asbrLSA->rte);
-                fa_tbl->resolve();
-            }
+            ospf->adv_best_asbr(asbrLSA->rte);
+            fa_tbl->resolve();
         }
     }
 }
@@ -396,16 +361,21 @@ void opqLSA::unparse_overlay_lsa() {
     // ABR-LSA
     if ((ls_id()>>24) == OPQ_T_MULTI_ABR) {
         abrLSA->n_nbrs = 0;
-        // abrLSA->nbrs = 0;
         abrLSA = 0;
     }
     // Prefix-LSA
     else if ((ls_id()>>24) == OPQ_T_MULTI_PREFIX) {
         overlayPrefixLSA *ptr, *pref = prefixLSA;
         overlayPrefixLSA **prev;
+        bool this_pref = false;
 
         if (!pref->rte)
 	        return;
+
+        if (pref->rte->in_use == pref) {
+            this_pref = true;
+            pref->rte->in_use = 0;
+        }
 
         // Unlink from list in RTE
         for (prev = &pref->rte->prefixes; (ptr = *prev); prev = (overlayPrefixLSA **)&ptr->link) {
@@ -413,6 +383,14 @@ void opqLSA::unparse_overlay_lsa() {
 	            *prev = (overlayPrefixLSA *) pref->link;
 	            break;
 	        }
+        }
+
+        // Check if there are still prefixes left (RTE still reachable)
+        if (pref->rte->prefixes) {
+            // This RTE was using this prefix to advertise its Summ-LSA
+            if (this_pref) {
+                ospf->adv_best_prefix(pref->rte);
+            }
         }
 
         prefixLSA->rte = 0;

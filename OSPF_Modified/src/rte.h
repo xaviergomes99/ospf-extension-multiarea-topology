@@ -22,6 +22,7 @@ class LSA;
 class SpfIfc;
 class SpfData;
 class INrte;
+class overlayPrefixLSA;
 
 /* Data structure storing multiple equal-cost paths.
  */
@@ -120,7 +121,8 @@ class RTE : public AVLitem {
     bool adv_overlay;   // This entry should be advertised in the ABR overlay
     bool has_been_adv;  // This entry has already been advertised by an ABR?
     bool has_intra_path;    // Reachable through an intra area path
-    uns32 intra_cost;       // Shortest intra-area path cost
+    uns32 intra_cost;   // Shortest intra-area path cost
+    MPath *intra_path;  // Shortest intra-area path (next-hops)
 
     RTE(uns32 key_a, uns32 key_b);
     void new_intra(TNode *V, bool stub, uns16 stub_cost, int index);
@@ -196,6 +198,7 @@ class INrte : public RTE {
     int uid;    // Unique ID (used as the Opaque ID)
 
   public:
+    overlayPrefixLSA *in_use;   // Prefix being used to advertise this destination
     class summLSA *summs;	// summary-LSAs
     class ASextLSA *ases;	// AS-external-LSAs
     class overlayPrefixLSA *prefixes;   // Prefix-LSAs
@@ -235,11 +238,12 @@ inline INrte::INrte(uns32 xnet, uns32 xmask) : RTE(xnet, xmask)
     tag = 0;
     summs = 0;
     ases = 0;
-    prefixes = 0;
     exdata = 0;
     exlist = 0;
     range = false;
     ase_orig = false;
+    prefixes = 0;
+    in_use = 0;
 }
 inline uns32 INrte::net()
 {

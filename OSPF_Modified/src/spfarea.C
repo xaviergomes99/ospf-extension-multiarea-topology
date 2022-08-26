@@ -298,22 +298,24 @@ void SpfArea::IfcChange(int increment)
 void SpfArea::generate_summaries()
 
 {
-    INrte *rte;
-    INiterator iter(inrttbl);
-    ASBRrte *rrte;
+    if (ospf->n_area > 1) {
+        INrte *rte;
+        INiterator iter(inrttbl);
+        ASBRrte *rrte;
 
-    while ((rte = iter.nextrte())) {
-	if (rte->intra_AS())
-	    sl_orig(rte);
-	else if (rte->is_range())
-	    sl_orig(rte);
+        while ((rte = iter.nextrte())) {
+        if (rte->intra_AS())
+            sl_orig(rte);
+        else if (rte->is_range())
+            sl_orig(rte);
+        }
+        // Originate ASBR-summary-LSAs
+        for (rrte = ospf->ASBRs; rrte; rrte = rrte->next())
+            asbr_orig(rrte);
+        // Originate default route into stub areas.
+        if (a_stub)
+        sl_orig(default_route);
     }
-    // Originate ASBR-summary-LSAs
-    for (rrte = ospf->ASBRs; rrte; rrte = rrte->next())
-        asbr_orig(rrte);
-    // Originate default route into stub areas.
-    if (a_stub)
-	sl_orig(default_route);
 }
 
 /* Reinitialize OSPF support in a given area.
