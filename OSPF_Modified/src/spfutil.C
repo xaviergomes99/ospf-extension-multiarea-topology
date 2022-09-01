@@ -434,6 +434,8 @@ char *msgtext(int msgno)
 	return("Rejecting grace request");
       case LOG_HTLEXIT:
 	return("Exiting hitless restart:");
+      case LOG_RECONF:
+      return("Reconfiguring router");
       default:
 	break;
     }

@@ -60,6 +60,7 @@ ConfigItem::~ConfigItem()
 void OSPF::cfgStart()
 
 {
+    spflog(LOG_RECONF, 5);
     ConfigItem *item;
 
     for (item = cfglist; item; item = item->next)

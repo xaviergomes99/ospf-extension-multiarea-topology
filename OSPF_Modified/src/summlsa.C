@@ -63,7 +63,7 @@ void summLSA::reoriginate(int forced)
 void OSPF::sl_orig(INrte *rte, bool transit_changes_only)
 
 {
-    // prevent intra-area routers from generating summ-LSAs???
+    // prevent intra-area routers from generating summ-LSAs
     if (n_area > 1) {
         SpfArea *ap;
         AreaIterator aiter(ospf);
@@ -326,7 +326,7 @@ void INrte::run_inter_area()
 
     // Even if we have a intra-area path to the destination, we will
     // still try and find a better inter-area path to it 
-    if (/*r_type == RT_SPF || */r_type == RT_DIRECT)
+    if (r_type == RT_DIRECT)
 	    return;
     // Saved state checked later in OSPF::rt_scan()
     if (r_type == RT_SPFIA || r_type == RT_SPF)
@@ -334,8 +334,7 @@ void INrte::run_inter_area()
 
     new_type = RT_NONE;
     best_path = 0;
-    if (r_type != RT_SPF)
-        cost = LSInfinity;
+    cost = LSInfinity;
     summ_ap = ospf->SummaryArea();
     // Go through list of summary-LSAs
     for (lsap = summs; lsap; lsap = (summLSA *)lsap->link) {
@@ -358,7 +357,7 @@ void INrte::run_inter_area()
         if (lsap->adv_cost == LSInfinity)
             continue;
         // Compare cost to current best
-        new_cost = lsap->adv_cost + rtr->cost;
+        new_cost = lsap->adv_cost + rtr->intra_cost;
         if (new_type != RT_NONE || r_type == RT_SPF) { 
             if (cost <= new_cost)
                 continue;
@@ -395,6 +394,15 @@ void INrte::run_inter_area()
     r_type = new_type;
     tag = 0;
     set_area(summ_ap->id());
+
+    // An update could have been done in a way in which we should change back to
+	// our stored intra-area path to the destination
+	if (intra_cost <= cost) {
+		cost = intra_cost;
+		r_type = RT_SPF;
+		update(intra_path);
+		changed = true;
+	}
 }
 
 /* Adjust existing backbone intra-area and inter-area routes to

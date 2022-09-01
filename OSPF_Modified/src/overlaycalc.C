@@ -164,16 +164,10 @@ void OSPF::update_path_overlay(RTE *rte, overlayAbrLSA *abr, uns32 cost)
 
     // We are using our advertised cost (our best intra-area path)
     if (abr == my_abr_lsa) {
-        // We are already using the intra-area path to this destination
-        if (rte->type() == RT_SPF)
-            return;
-        else {
-            printf("Using my ABR, changing cost and path to intra_area\n");
-            rte->cost = rte->intra_cost;
-            rte->r_type = RT_SPF;
-            rte->update(rte->intra_path);
-            return;
-        }
+        rte->cost = cost;
+        rte->r_type = RT_SPF;
+        rte->update(rte->intra_path);
+        return;
     }
 
     // Gather all the necessary information in order to update the entry
@@ -183,7 +177,6 @@ void OSPF::update_path_overlay(RTE *rte, overlayAbrLSA *abr, uns32 cost)
         if (nbr->get_rid() == next_abr)
             break;
     }
-    // BUG HERE
     rtr = nbr->rtr->t_dest;
 
     // Update the entry with the new cost and path
@@ -208,7 +201,16 @@ void OSPF::adv_best_prefix(INrte *rte)
         found = false;
         best_cost = LSInfinity;
         for (pref = rte->prefixes; pref; pref = (overlayPrefixLSA *) pref->link) {
-            if ((abr = (overlayAbrLSA *) abrLSAs.find(pref->index1()))) {
+            if (pref->index1() == my_id()) {
+                found = true;
+                cost = pref->prefix.metric;
+                if (cost < best_cost) {
+                    best_cost = cost;
+                    best_abr = my_abr_lsa;
+                    in_use = pref;
+                }
+            }
+            else if ((abr = (overlayAbrLSA *) abrLSAs.find(pref->index1()))) {
                 found = true;
                 cost = abr->cost + pref->prefix.metric;
                 if (cost < best_cost) {
@@ -220,7 +222,7 @@ void OSPF::adv_best_prefix(INrte *rte)
         }
         // Assign the best cost to the routing table entry and
         // generate the corresponding Summ-LSA, if the cost has changed
-        if (found && (rte->cost != best_cost || !rte->has_been_adv)) {
+        if (found && (rte->changed || rte->cost != best_cost || !rte->has_been_adv)) {
             update_path_overlay(rte, best_abr, best_cost);
             rte->has_been_adv = true;
             rte->in_use = in_use;

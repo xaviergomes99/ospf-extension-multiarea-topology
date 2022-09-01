@@ -43,6 +43,7 @@ public:
     overlayAbrLSA *abrLSA;  // Link to corresponding ABR-LSA
     overlayPrefixLSA *prefixLSA; // Link to corresponding Prefix-LSA
     overlayAsbrLSA *asbrLSA; // Link to corresponding ASBR-LSA
+    // bool delay; // We need to delay the parsing of this LSA until we send our first ABR-LSA
     
     opqLSA(class SpfIfc *, class SpfArea *, LShdr *, int blen);
     virtual void reoriginate(int forced);

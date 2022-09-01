@@ -324,7 +324,6 @@ void print_opq_lsa(byte *body, int len, lsid_t opq_type)
 
 {
     lsid_t type = (opq_type << 24) >> 24;
-    printf("Type %d - Prefix %d\n", type, OPQ_T_MULTI_PREFIX);
     // ABR-LSA
     if (type == OPQ_T_MULTI_ABR) {
         ABRhdr *abr;

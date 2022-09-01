@@ -34,6 +34,10 @@ opqLSA::opqLSA(SpfIfc *i, SpfArea *a, LShdr *hdr, int blen)
     adv_opq = false;
     local_body = 0;
     local_blen = 0;
+    abrLSA = 0;
+    prefixLSA = 0;
+    asbrLSA = 0;
+    // delay = false;
 }
 
 /* Parse a opaque-LSA. Just set the exception

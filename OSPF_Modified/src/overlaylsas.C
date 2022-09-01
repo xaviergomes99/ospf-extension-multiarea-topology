@@ -204,13 +204,14 @@ void OSPF::orig_abrLSA() {
 
     blen = added_nbrs.size() * sizeof(ABRhdr);
     if (blen > 0) {
-        opq_orig(0, 0, LST_AS_OPQ, lsid, (byte *) &body_start, blen, true, 1);
+        opq_orig(0, 0, LST_AS_OPQ, lsid, (byte *) &body_start, blen, true, 0);
         // If we are updating our own ABR-LSA, do a complete overlay Dijkstra calculation
         if (first_abrLSA_sent)
             calc_overlay = true;
         // This is the first ABR-LSA we are sending out
         else {
             first_abrLSA_sent = true;
+            // parse_delayed_lsas();
             send_all_prefixes = true;
         }
     }
@@ -230,7 +231,7 @@ void OSPF::orig_prefixLSA(INrte *rte) {
     body.subnet_addr = hton32(rte->net());
     body.subnet_mask = hton32(rte->mask());
 
-    opq_orig(0, 0, LST_AS_OPQ, lsid, (byte *) &body, sizeof(Prefixhdr), true, 1);
+    opq_orig(0, 0, LST_AS_OPQ, lsid, (byte *) &body, sizeof(Prefixhdr), true, 0);
 }
 
 /* For a given ASBR (reachable through an area we are attached to)
@@ -246,7 +247,7 @@ void OSPF::orig_asbrLSA(ASBRrte *rte) {
     body.metric = rte->intra_cost;
     body.dest_rid = hton32(rte->rtrid());
 
-    opq_orig(0, 0, LST_AS_OPQ, lsid, (byte *) &body, sizeof(ASBRhdr), true, 1);
+    opq_orig(0, 0, LST_AS_OPQ, lsid, (byte *) &body, sizeof(ASBRhdr), true, 0);
 }
 
 /* We advertise all the current intra-area routes to prefixes and ASBRs
@@ -276,6 +277,34 @@ void OSPF::advertise_all_prefixes() {
     ospf->send_all_prefixes = false;
 }
 
+// /* Parse the overlay LSAs that have been delayed since we hadn't yet send
+//  * our own ABR-LSA out yet.
+//  */
+
+// void OSPF::parse_delayed_lsas() 
+
+// {
+//     opqLSA *lsa;
+
+//     lsa = (opqLSA *) ASOpqLSAs.sllhead;
+//     for (; lsa; lsa = (opqLSA *) lsa->sll) {
+//         if (lsa->delay) {
+//             lsa->delay = false;
+//             if (lsa->abrLSA) {
+//                 calc_overlay = true;
+//             }
+//             else if (lsa->prefixLSA) {
+//                 if ((n_overlay_dijkstras > 0)) {
+//                     adv_best_prefix(lsa->prefixLSA->rte);
+//                     fa_tbl->resolve();
+//                 }
+//                 else 
+//                     lsa->delay = true;
+//             }
+//         }
+//     }
+// }
+
 /* Parse a received overlay-LSA.
  * This LSA can either be:
  *      - ABR-LSA
@@ -299,6 +328,9 @@ void opqLSA::parse_overlay_lsa(LShdr *hdr) {
 
         if (adv_rtr() == ospf->my_id())
             ospf->my_abr_lsa = abrLSA;
+        
+        // if (!ospf->first_abrLSA_sent)
+        //     delay = true;
     }
     // Prefix-LSA
     else if ((ls_id()>>24) == OPQ_T_MULTI_PREFIX) {
@@ -325,6 +357,9 @@ void opqLSA::parse_overlay_lsa(LShdr *hdr) {
             ospf->adv_best_prefix(prefLSA->rte);
             fa_tbl->resolve();
         }
+        // else {
+        //     delay = true;
+        // }
     }
     // ASBR-LSA
     else if ((ls_id()>>24) == OPQ_T_MULTI_ASBR) {
@@ -369,8 +404,11 @@ void opqLSA::unparse_overlay_lsa() {
         overlayPrefixLSA **prev;
         bool this_pref = false;
 
-        if (!pref->rte)
-	        return;
+        if (!pref->rte) {
+            prefixLSA->rte = 0;
+            prefixLSA = 0;
+            return;
+        }
 
         if (pref->rte->in_use == pref) {
             this_pref = true;

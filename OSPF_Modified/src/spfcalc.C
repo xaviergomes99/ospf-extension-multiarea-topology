@@ -51,6 +51,10 @@ void OSPF::rtsched(LSA *newlsa, RTE *old_rte)
 		case LST_RTR:
 		case LST_NET:
 			full_sched = true;
+			if ((n_area > 1) &&
+				(first_abrLSA_sent)) {
+					calc_overlay = true;
+				}
 			break;
 		case LST_SUMM:
 			if (full_sched)
@@ -307,27 +311,29 @@ void RTE::new_intra(TNode *V, bool stub, uns16 stub_cost, int _index)
 
 	if (r_type == RT_DIRECT)
 		return;
-	// Better cost already found
-    else if (total_cost > intra_cost && total_cost > cost && has_intra_path)
-		return;
+	else if (dijk_run != (ospf->n_dijkstras & 1)) {
+	// First time encountered in Dijkstra
+	save_state();
+    }
+	else if (r_type != RT_SPF && r_type != RT_SPFIA)
+		changed = true;
     else if (total_cost == cost)
 		merge = true;
-    else if (dijk_run != (ospf->n_dijkstras & 1)) {
-		// First time encountered in Dijkstra
-		save_state();
-    }
 
 	has_intra_path = true;
-	if (total_cost < intra_cost)
+	if (intra_cost != total_cost) {
 		intra_cost = total_cost;
+		changed = true;
+	}
+
+	// Note that we have updated during Dijkstra
+	dijk_run = ospf->n_dijkstras & 1;
+	// Note area change
+	if (V->area()->id() != area())
+		changed = true;
 
 	// This route only replaces a inter-area path if it is better
 	if (total_cost <= cost) {
-		// Note that we have updated during Dijkstra
-		dijk_run = ospf->n_dijkstras & 1;
-		// Note area change
-		if (V->area()->id() != area())
-			changed = true;
 		// Update routing table entry
 		r_type = RT_SPF;
 		cost = total_cost;
@@ -475,7 +481,6 @@ void RTE::declare_unreachable()
 void INrte::declare_unreachable()
 
 {
-	printf("Declare unreachable\n");
     if (ases &&
 	r_type != RT_NONE &&
 	r_type != RT_EXTT1 &&
@@ -483,38 +488,6 @@ void INrte::declare_unreachable()
         ospf->ase_sched = true;
     if (r_type == RT_DIRECT)
 		ospf->full_sched = true;
-	
-	if (ospf->n_area > 1) {
-		// Prematurely age the prefix we originated for this RTE
-		if (prefixes) {
-			overlayPrefixLSA *pref;
-			for (pref = prefixes; pref; pref = (overlayPrefixLSA *) pref->link) {
-				if (pref->lsa->adv_rtr() == ospf->my_id()) {
-					pref->lsa->adv_opq = false;
-					pref->lsa->reoriginate(false);
-				}
-			}
-		}
-
-		// There are still prefixes left for this RTE, so we only declare the route
-		// unreachable via its intra-area route.
-		if (prefixes) {
-			printf("Still has prefixes\n");
-			has_intra_path = false;
-			intra_cost = LSInfinity;
-			intra_path = 0;
-			ospf->full_sched = true;
-			return;
-		}
-		// There are no prefixes left available for this destination, so we also
-		// age the originated Summ-LSA for this destination
-		else {
-			summLSA *my_lsa;
-			my_lsa = my_summary_lsa();
-			if (my_lsa)
-				lsa_flush(my_lsa);
-		}
-	}
 
     RTE::declare_unreachable();
 }
@@ -665,7 +638,7 @@ void OSPF::rt_scan()
 			rte->changed = true;
 		}
 		// Look at summary-LSAs
-		if (rte->inter_area() || rte->summs)
+		if ((n_area == 1) && (rte->inter_area() || rte->summs))
 			rte->run_inter_area();
 		// Transit area processing
 		if (rte->intra_AS() && rte->area() == BACKBONE)
@@ -681,8 +654,6 @@ void OSPF::rt_scan()
 		// On changes, re-originate summary-LSAs
 		// Ranges ignored if also physical link
 		if (rte->changed || rte->state_changed() || exiting_htl_restart) {
-			rte->changed = false;
-			rte->sys_install();
 			if (!rte->is_range() && ospf->n_area > 1) {
 				if (rte->has_intra_path && rte->intra_cost != LSInfinity) {
 					rte->adv_overlay = true;
@@ -692,7 +663,40 @@ void OSPF::rt_scan()
 						sl_orig(rte);
 					}
 				}
+				else if (rte->has_been_adv) {
+					// Prematurely age the prefix we originated for this RTE
+					if (rte->prefixes) {
+						overlayPrefixLSA *pref;
+						for (pref = rte->prefixes; pref; pref = (overlayPrefixLSA *) pref->link) {
+							if (pref->lsa->adv_rtr() == my_id()) {
+								pref->lsa->adv_opq = false;
+								pref->lsa->reoriginate(false);
+							}
+						}
+					}
+
+					// There are still prefixes left for this RTE, so we only declare the route
+					// unreachable via its intra-area route.
+					if (rte->prefixes) {
+						rte->has_intra_path = false;
+						rte->intra_cost = LSInfinity;
+						rte->intra_path = 0;
+						rte->adv_overlay = false;
+						return;
+					}
+					// There are no prefixes left available for this destination, so we also
+					// age the originated Summ-LSA for this destination
+					else {
+						summLSA *my_lsa;
+						my_lsa = rte->my_summary_lsa();
+						if (my_lsa)
+							lsa_flush(my_lsa);
+						rte->declare_unreachable();
+					}
+				}
 			}
+			rte->sys_install();
+			rte->changed = false;
 		}
 		// Don't originate summaries of backbone routes
 		// into transit areas
@@ -953,14 +957,6 @@ void INrte::incremental_summary(SpfArea *a)
 
     // Incremental summary-LSA calculations
     run_inter_area();
-	// An update could have been done in a way in which we should change back to
-	// our stored intra-area path to the destination
-	if (intra_cost <= cost) {
-		cost = intra_cost;
-		r_type = RT_SPF;
-		update(intra_path);
-		changed = true;
-	}
     if (inter_area() && area() == BACKBONE)
 	run_transit_areas(summs);
     // Failed virtual next hop resolution?

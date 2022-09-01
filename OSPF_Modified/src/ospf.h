@@ -330,6 +330,7 @@ class OSPF : public ConfigItem {
     void orig_prefixLSA(INrte *);
     void orig_asbrLSA(ASBRrte *);
     void advertise_all_prefixes();
+    // void parse_delayed_lsas();
 
     void overlay_calc();
     void overlay_dijkstra();
