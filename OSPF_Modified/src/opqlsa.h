@@ -70,6 +70,17 @@ class OpqHoldQ : public AVLitem {
     friend class OSPF;
 };
 
+class AbrLSAItem {
+    ABRhdr nbr;
+    AbrLSAItem *next;
+    AbrLSAItem *prev;
+public:
+    AbrLSAItem();
+    ~AbrLSAItem();
+    friend class OSPF;
+    friend class opqLSA;
+};
+
 class overlayAbrLSA : public PriQElt, public AVLitem {
     opqLSA *lsa;    // Corresponding opaque-LSA
     uns32 cost;     // Cost to the ABR
@@ -77,8 +88,8 @@ class overlayAbrLSA : public PriQElt, public AVLitem {
     byte t_state;   // Current state of this ABR, in the dijkstra calc
     overlayAbrLSA *t_parent;    // Parent on the SPF Tree
     overlayAbrLSA *next_abr_hop;    // First ABR hop to this ABR
-    // ABRhdr *nbrs;   // Neighbors described in the LSA
     int n_nbrs;     // Number of neighbors described
+    AbrLSAItem *nbrs;   // Neighbors described in the LSA
 public:
     overlayAbrLSA(class opqLSA *);
     ~overlayAbrLSA();

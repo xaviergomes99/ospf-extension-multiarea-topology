@@ -11,6 +11,7 @@ class ABRNbr : public AVLitem {
     uns32 cost;     // Intra-area shortest path cost
     rtrLSA *rtr;    // Link to corresponding Router-LSA
     SpfArea *area;  // Area in which we are neighbors with the ABR
+    bool use_in_lsa;    // This ABRNbr is to be considered when building the ABR-LSA
 public:
     ABRNbr(rtrLSA *lsa, SpfArea *a);
     virtual ~ABRNbr();
@@ -19,9 +20,10 @@ public:
     inline uns32 get_cost();
     inline rtrLSA *get_rtrLSA();
     inline SpfArea *get_area();
-    void remove_abr_nb();
+    // void remove_abr_nb();
     friend class OSPF;
     friend class LSA;
+    friend class rtrLSA;
 };
 
 // Inline functions

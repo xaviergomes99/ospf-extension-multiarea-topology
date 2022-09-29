@@ -248,7 +248,8 @@ void print_statistics(StatRsp *s)
     printf("\t\tInter-area multicast:\t%s\r\n", yesorno(s->inter_area_mc));
     printf("Inter-AS multicast: %s", yesorno(s->inter_AS_mc));
     printf("\t\tIn overflow state:\t%s\r\n", yesorno(s->overflow_state));
-    printf("ospfd version:\t%d.%d\r\n\n", s->vmajor, s->vminor);
+    printf("ospfd version:\t%d.%d", s->vmajor, s->vminor);
+	printf("\t\t# Overlay Dijkstras:\t%d\r\n\n", ntoh32(s->n_overlay_dijkstra));
 
     // Network byte order
     ospf_router_id = s->router_id;

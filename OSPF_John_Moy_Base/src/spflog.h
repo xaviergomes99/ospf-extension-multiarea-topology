@@ -96,6 +96,7 @@ enum {
     LOG_HELPER_STOP,	// Leave helper mode
     LOG_GRACE_REJECT,	// Reject grace request
     LOG_HTLEXIT,	// Exiting hitless restart
+    LOG_RECONF,     // Reconfiguring parameters
     MAXLOG,		// KEEP THIS LAST!!!!
 };
 

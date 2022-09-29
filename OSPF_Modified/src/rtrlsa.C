@@ -501,8 +501,12 @@ void rtrLSA::parse(LShdr *hdr)
 			}
 			// There is a link to a ABRNbr created, but it is wrong
 			else if ((abr->get_rid() != orig_rtr) || (abr->get_rtrLSA() != this)) {
-				abr->remove_abr_nb();
-				abr = new ABRNbr(this, area());
+				abr->rid = orig_rtr;
+				abr->_index1 = orig_rtr;
+				abr->area = area();
+				abr->_index2 = area()->id();
+				abr->rtr = this;
+				abr->cost = LSInfinity;
 			}
 		}
 	}
@@ -636,8 +640,10 @@ void rtrLSA::unparse()
 
 {
     unlink();
-	if (abr)
-		abr->remove_abr_nb();
+	if (abr) {
+		abr->cost = LSInfinity;
+		ospf->abr_changed = true;
+	}
 }
 
 /* Unlink a transit node (router or network-LSA) from its

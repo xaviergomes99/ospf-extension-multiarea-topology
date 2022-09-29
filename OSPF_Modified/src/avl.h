@@ -54,6 +54,7 @@ public:
 
     friend class AVLtree;
     friend class AVLsearch;
+    friend class rtrLSA;
     friend void left_shift(AVLitem **);
     friend void dbl_left_shift(AVLitem **);
     friend void right_shift(AVLitem **);

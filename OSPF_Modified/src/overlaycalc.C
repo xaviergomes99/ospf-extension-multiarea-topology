@@ -33,31 +33,31 @@ void OSPF::overlay_dijkstra()
 
 {
     PriQ cand;
-    overlayAbrLSA *abr;
+    overlayAbrLSA *abr, *abr_init;
 
     n_overlay_dijkstras++;
-    
+
     // Initialize state of ABR nodes and candidate list
     // Iterate through all the ABR-LSAs available
-    abr = (overlayAbrLSA *) abrLSAs.sllhead;
-    for (; abr; abr = (overlayAbrLSA *) abr->sll) {
+    abr_init = (overlayAbrLSA *) abrLSAs.sllhead;
+    for (; abr_init; abr_init = (overlayAbrLSA *) abr_init->sll) {
         // Initialize the overlay Dijkstra calculation, 
         // by adding our ABR-LSA to the candidate list
-        if (abr == my_abr_lsa) {
-            abr->cost0 = 0;
-            abr->cost1 = 0;
-            cand.priq_add(abr);
-            abr->t_state = DS_ONCAND;
+        if (abr_init->index1() == my_id()) {
+            abr_init->cost0 = 0;
+            abr_init->cost1 = 0;
+            cand.priq_add(abr_init);
+            abr_init->t_state = DS_ONCAND;
         }
         else {
-            abr->t_state = DS_UNINIT;
-            abr->t_parent = 0;
+            abr_init->t_state = DS_UNINIT;
+            abr_init->t_parent = 0;
         }
     }
 
     // Go through the candidate list
     while ((abr = (overlayAbrLSA *) cand.priq_rmhead())) {
-        ABRhdr *nbr;
+        AbrLSAItem *nbr;
         overlayAbrLSA *abr_nbr = 0;
         uns32 new_cost;
         int i;
@@ -67,13 +67,13 @@ void OSPF::overlay_dijkstra()
         abr->cost = abr->cost0;
 
         // Scan neighboring ABRs
-        nbr = (ABRhdr *) abr->lsa->lsa_body;
-        for (i = 0; i < abr->n_nbrs; nbr++, i++) {
-            abr_nbr = (overlayAbrLSA *) abrLSAs.find(hton32(nbr->neigh_rid));
+        nbr = (AbrLSAItem *) abr->nbrs;
+        for (i = 0; i < abr->n_nbrs; nbr = nbr->next, i++) {
+            abr_nbr = (overlayAbrLSA *) abrLSAs.find(nbr->nbr.neigh_rid);
             if (abr_nbr) {
                 if (abr_nbr->t_state == DS_ONTREE)
                     continue;
-                new_cost = abr->cost0 + nbr->metric;
+                new_cost = abr->cost0 + nbr->nbr.metric;
                 if (abr_nbr->t_state == DS_ONCAND) {
                     if (new_cost > abr_nbr->cost0)
                         continue;
@@ -112,12 +112,12 @@ void OSPF::set_overlay_nh()
             if (abr->t_parent == 0)
                 continue;
             // ABR neighbors are their own next ABR hop
-            else if (abr->t_parent == my_abr_lsa)
+            else if (abr->t_parent->index1() == my_id())
                 abr->next_abr_hop = abr;
             // More distant ABRs
             else {
                 parent = abr->t_parent;
-                while (parent->t_parent != my_abr_lsa)
+                while (parent->t_parent->index1() != my_id())
                     parent = parent->t_parent;
                 abr->next_abr_hop = parent;
             }
@@ -161,9 +161,16 @@ void OSPF::update_path_overlay(RTE *rte, overlayAbrLSA *abr, uns32 cost)
     rtid_t next_abr;
     ABRNbr *nbr;
     RTE *rtr;
+    bool found = false;
+
+    if (cost >= LSInfinity) {
+        rte->declare_unreachable();
+        return;
+    }
 
     // We are using our advertised cost (our best intra-area path)
-    if (abr == my_abr_lsa) {
+    // We still give preference to intra-area paths if the cost is the same
+    if ((abr->index1() == my_id()) || (cost == rte->intra_cost)) {
         rte->cost = cost;
         rte->r_type = RT_SPF;
         rte->update(rte->intra_path);
@@ -171,18 +178,24 @@ void OSPF::update_path_overlay(RTE *rte, overlayAbrLSA *abr, uns32 cost)
     }
 
     // Gather all the necessary information in order to update the entry
-    next_abr = abr->next_abr_hop->index1();
-    nbr = (ABRNbr *) added_nbrs.sllhead;
+    if (!abr->next_abr_hop)
+        set_overlay_nh();
+    next_abr = abr->next_abr_hop->lsa->adv_rtr();
+    nbr = (ABRNbr *) ABRNbrs.sllhead;
     for (; nbr; nbr = (ABRNbr *) nbr->sll) {
-        if (nbr->get_rid() == next_abr)
+        if ((nbr->get_rid() == next_abr) && nbr->use_in_lsa) {
+            found = true;
             break;
+        }
     }
-    rtr = nbr->rtr->t_dest;
+    if (found) {
+        rtr = nbr->rtr->t_dest;
 
-    // Update the entry with the new cost and path
-    rte->cost = cost;
-    rte->r_type = RT_SPFIA;
-    rte->update(rtr->r_mpath);
+        // Update the entry with the new cost and path
+        rte->cost = cost;
+        rte->r_type = RT_SPFIA;
+        rte->update(rtr->r_mpath);
+    }
 }
 
 /* Determine the best Prefix-LSA for a given destination, update our own 
@@ -201,28 +214,24 @@ void OSPF::adv_best_prefix(INrte *rte)
         found = false;
         best_cost = LSInfinity;
         for (pref = rte->prefixes; pref; pref = (overlayPrefixLSA *) pref->link) {
-            if (pref->index1() == my_id()) {
-                found = true;
-                cost = pref->prefix.metric;
-                if (cost < best_cost) {
-                    best_cost = cost;
-                    best_abr = my_abr_lsa;
-                    in_use = pref;
-                }
-            }
-            else if ((abr = (overlayAbrLSA *) abrLSAs.find(pref->index1()))) {
-                found = true;
-                cost = abr->cost + pref->prefix.metric;
-                if (cost < best_cost) {
-                    best_cost = cost;
-                    best_abr = abr;
-                    in_use = pref;
+            abr = (overlayAbrLSA *) abrLSAs.sllhead;
+            for (; abr; abr = (overlayAbrLSA *) abr->sll) {
+                if ((abr->index1() == pref->index1())) {
+                    found = true;
+                    cost = abr->cost + pref->prefix.metric;
+                    if (cost < best_cost) {
+                        best_cost = cost;
+                        best_abr = abr;
+                        in_use = pref;
+                    }
+                    break;
                 }
             }
         }
         // Assign the best cost to the routing table entry and
         // generate the corresponding Summ-LSA, if the cost has changed
-        if (found && (rte->changed || rte->cost != best_cost || !rte->has_been_adv)) {
+        if (found && (rte->changed || rte->cost != best_cost 
+                      || !rte->has_been_adv || in_use != rte->in_use)) {
             update_path_overlay(rte, best_abr, best_cost);
             rte->has_been_adv = true;
             rte->in_use = in_use;

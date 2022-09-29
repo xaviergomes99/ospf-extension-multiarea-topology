@@ -82,6 +82,7 @@ struct StatRsp {
     uns32 n_ase_import;
     uns32 extdb_limit;
     uns32 n_dijkstra;
+    uns32 n_overlay_dijkstra;
     uns16 n_area;
     uns16 n_dbx_nbrs;
     byte mospf;

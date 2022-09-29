@@ -26,6 +26,7 @@ overlayAbrLSA::overlayAbrLSA(opqLSA *opq)
     ospf->abrLSAs.add(this);
     t_parent = 0;
     next_abr_hop = 0;
+    nbrs = 0;
 }
 
 /* Destructor for the ABR-LSA
@@ -34,6 +35,24 @@ overlayAbrLSA::overlayAbrLSA(opqLSA *opq)
 overlayAbrLSA::~overlayAbrLSA()
 {
     ospf->abrLSAs.remove(this);
+}
+
+/* Constructor for the ABR-LSA body item
+ */
+
+AbrLSAItem::AbrLSAItem()
+{
+    next = 0;
+    prev = 0;
+}
+
+/* Destructor for the ABR-LSA body item
+ */
+
+AbrLSAItem::~AbrLSAItem()
+{
+    if (prev)
+        prev->next = next;
 }
 
 /* Constructor for the Prefix-LSA
@@ -89,6 +108,7 @@ ABRNbr::ABRNbr(rtrLSA *lsa, SpfArea *a) : AVLitem(lsa->adv_rtr(), a->id()) {
     rtr = lsa;
     cost = LSInfinity;
     area = a;
+    use_in_lsa = false;
     rtr->abr = this;
     ospf->ABRNbrs.add(this);
 }
@@ -103,19 +123,19 @@ ABRNbr::~ABRNbr() {}
  * corresponding Router-LSA.
  */
 
-void ABRNbr::remove_abr_nb() {
-    ospf->ABRNbrs.remove(this);
-    rtr->abr = 0;
-    rtr = 0;
-    area = 0;
-    ospf->abr_changed = true;
-    if (ospf->ABRNbrs.size() == 0 && ospf->my_abr_lsa) {
-        ospf->my_abr_lsa->lsa->adv_opq = false;
-        ospf->my_abr_lsa->lsa->reoriginate(false);
-        ospf->first_abrLSA_sent = false;
-        ospf->my_abr_lsa = 0;
-    }
-}
+// void ABRNbr::remove_abr_nb() {
+//     // rtr->abr = 0;
+//     rtr = 0;
+//     area = 0;
+//     ospf->abr_changed = true;
+//     ospf->ABRNbrs.remove(this);
+//     if (ospf->ABRNbrs.size() == 0 && ospf->my_abr_lsa) {
+//         ospf->my_abr_lsa->lsa->adv_opq = false;
+//         ospf->my_abr_lsa->lsa->reoriginate(false);
+//         ospf->first_abrLSA_sent = false;
+//         ospf->my_abr_lsa = 0;
+//     }
+// }
 
 /* Add an ABR to OSPF. If already added, return it. Otherwise
  * allocate entry and add it to the AVL and singly linked list.
@@ -149,22 +169,22 @@ ABRrte *OSPF::add_abr(uns32 rtrid)
  */
 
 void OSPF::orig_abrLSA() {
-    ABRNbr *abrNbr, *abr;
-    ABRhdr *body, curr, body_start;
+    ABRNbr *abrNbr, *abrInLsa;
+    ABRhdr *body, curr;
     int blen;
     lsid_t lsid;
     uns32 cost;
     bool found;
+    int n_added = 0;
 
     abr_changed = false;
     lsid = OPQ_T_MULTI_ABR << 24;
     body = &body_start;
 
-    //Clear the added_nbrs list manually since the AVLtree::clear() causes issues
-    if (added_nbrs.size() > 0) {
-        abr = (ABRNbr *) added_nbrs.sllhead;
-        for (; abr; abr = (ABRNbr *) abr->sll)
-            added_nbrs.remove(abr);
+    // Clear previous additions
+    abrNbr = (ABRNbr *) ABRNbrs.sllhead;
+    for (; abrNbr; abrNbr = (ABRNbr *) abrNbr->sll) {
+        abrNbr->use_in_lsa = false;
     }
 
     // Iterate through all ABR neighbor entries
@@ -174,46 +194,59 @@ void OSPF::orig_abrLSA() {
         // Cost is assigned, so we add to the LSA
         if (cost < LSInfinity) {
             found = false;
-            abr = (ABRNbr *) added_nbrs.sllhead;
-            for (; abr; abr = (ABRNbr *) abr->sll) {
+            abrInLsa = (ABRNbr *) ABRNbrs.sllhead;
+            for (; abrInLsa; abrInLsa = (ABRNbr *) abrInLsa->sll) {
                 // There is already an entry for this ABR
-                if (abr->get_rid() == abrNbr->rid) {
+                if ((abrInLsa->get_rid() == abrNbr->rid) && abrInLsa->use_in_lsa) {
                     found = true;
                     // There is an entry for this ABR with a lower cost
-                    if (abr->get_cost() >= cost) {
-                        added_nbrs.remove(abr);
-                        added_nbrs.add(abrNbr);
+                    if (abrInLsa->get_cost() >= cost) {
+                        abrInLsa->use_in_lsa = false;
+                        abrNbr->use_in_lsa = true;
                     }
                     break;
                 }
             }
             // New neighbor
-            if (!found)
-                added_nbrs.add(abrNbr);
+            if (!found) {
+                abrNbr->use_in_lsa = true;
+                n_added++;
+            }
         }
     }
 
     // Add only the lower cost entries
-    abrNbr = (ABRNbr *) added_nbrs.sllhead;
+    abrNbr = (ABRNbr *) ABRNbrs.sllhead;
     for (; abrNbr; abrNbr = (ABRNbr *) abrNbr->sll) {
-        curr.metric = abrNbr->cost;
-        curr.neigh_rid = ntoh32(abrNbr->rid);
-        memcpy(body, &curr, sizeof(ABRhdr));
-        body++;
+        if (abrNbr->use_in_lsa) {
+            curr.metric = abrNbr->cost;
+            curr.neigh_rid = ntoh32(abrNbr->rid);
+            memcpy(body, &curr, sizeof(ABRhdr));
+            body++;
+        }
     }
 
-    blen = added_nbrs.size() * sizeof(ABRhdr);
+    blen = n_added * sizeof(ABRhdr);
     if (blen > 0) {
         opq_orig(0, 0, LST_AS_OPQ, lsid, (byte *) &body_start, blen, true, 0);
-        // If we are updating our own ABR-LSA, do a complete overlay Dijkstra calculation
-        if (first_abrLSA_sent)
-            calc_overlay = true;
         // This is the first ABR-LSA we are sending out
-        else {
+        if (!first_abrLSA_sent) {
             first_abrLSA_sent = true;
             // parse_delayed_lsas();
             send_all_prefixes = true;
         }
+    }
+    // No neighbors have been added, so we clear the ABRNbr list
+    else if (first_abrLSA_sent) {
+        abrNbr = (ABRNbr *) ABRNbrs.sllhead;
+        for (; abrNbr; abrNbr = (ABRNbr *) abrNbr->sll) {
+            abrNbr->rtr->abr = 0;
+        }
+        ABRNbrs.clear();
+        ospf->my_abr_lsa->lsa->adv_opq = false;
+        ospf->my_abr_lsa->lsa->reoriginate(false);
+        ospf->first_abrLSA_sent = false;
+        ospf->my_abr_lsa = 0;
     }
 }
 
@@ -277,9 +310,9 @@ void OSPF::advertise_all_prefixes() {
     ospf->send_all_prefixes = false;
 }
 
-// /* Parse the overlay LSAs that have been delayed since we hadn't yet send
-//  * our own ABR-LSA out yet.
-//  */
+/* Parse the overlay LSAs that have been delayed since we hadn't yet send
+ * our own ABR-LSA out yet.
+ */
 
 // void OSPF::parse_delayed_lsas() 
 
@@ -325,12 +358,33 @@ void opqLSA::parse_overlay_lsa(LShdr *hdr) {
 
         this->abrLSA = abrLSA;
         abrLSA->n_nbrs = (ntoh16(hdr->ls_length) - sizeof(LShdr))/sizeof(ABRhdr);
+        
+        // Update first neighbor structure
+        ABRhdr *body = (ABRhdr *) (hdr + 1);
+        AbrLSAItem *curr;
+        if (!abrLSA->nbrs)
+            abrLSA->nbrs = new AbrLSAItem();
+        curr = abrLSA->nbrs;
+        curr->nbr.metric = body->metric;
+        curr->nbr.neigh_rid = hton32(body->neigh_rid);
+        body++;
+
+        // Update possible subsequent neighbors 
+        int i;
+        for (i = 1; i < abrLSA->n_nbrs; i++, body++) {
+            if (!curr->next)
+                curr->next = new AbrLSAItem();
+            curr->next->prev = curr;
+            curr = curr->next;
+            curr->nbr.metric = body->metric;
+            curr->nbr.neigh_rid = hton32(body->neigh_rid);
+        }
 
         if (adv_rtr() == ospf->my_id())
             ospf->my_abr_lsa = abrLSA;
         
-        // if (!ospf->first_abrLSA_sent)
-        //     delay = true;
+        if (ospf->first_abrLSA_sent)
+            ospf->calc_overlay = true;
     }
     // Prefix-LSA
     else if ((ls_id()>>24) == OPQ_T_MULTI_PREFIX) {
@@ -356,6 +410,9 @@ void opqLSA::parse_overlay_lsa(LShdr *hdr) {
         if (ospf->first_abrLSA_sent && (ospf->n_overlay_dijkstras > 0)) {
             ospf->adv_best_prefix(prefLSA->rte);
             fa_tbl->resolve();
+        }
+        else {
+            prefLSA->rte->has_been_adv = false;
         }
         // else {
         //     delay = true;
@@ -396,6 +453,7 @@ void opqLSA::unparse_overlay_lsa() {
     // ABR-LSA
     if ((ls_id()>>24) == OPQ_T_MULTI_ABR) {
         abrLSA->n_nbrs = 0;
+        abrLSA->nbrs = 0;
         abrLSA = 0;
     }
     // Prefix-LSA

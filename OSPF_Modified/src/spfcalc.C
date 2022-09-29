@@ -51,10 +51,10 @@ void OSPF::rtsched(LSA *newlsa, RTE *old_rte)
 		case LST_RTR:
 		case LST_NET:
 			full_sched = true;
-			if ((n_area > 1) &&
-				(first_abrLSA_sent)) {
-					calc_overlay = true;
-				}
+			// if ((n_area > 1) &&
+			// 	(first_abrLSA_sent)) {
+			// 		calc_overlay = true;
+			// 	}
 			break;
 		case LST_SUMM:
 			if (full_sched)
@@ -94,11 +94,11 @@ void OSPF::rtsched(LSA *newlsa, RTE *old_rte)
 			}
 			break;
 		case LST_AS_OPQ:
-			if ((n_area > 1) && 
-				((newlsa->ls_id()>>24) == OPQ_T_MULTI_ABR) && 
-				(newlsa->adv_rtr() != my_id())) {
-				calc_overlay = true;
-			}
+			// if ((n_area > 1) && 
+			// 	((newlsa->ls_id()>>24) == OPQ_T_MULTI_ABR) && 
+			// 	(newlsa->adv_rtr() != my_id())) {
+			// 	calc_overlay = true;
+			// }
 			break;
 		default:
 			break;
