@@ -324,6 +324,8 @@ void RTE::new_intra(TNode *V, bool stub, uns16 stub_cost, int _index)
 	if (intra_cost != total_cost) {
 		intra_cost = total_cost;
 		changed = true;
+		set_origin(V);
+		set_area(V->area()->id());
 	}
 
 	// Note that we have updated during Dijkstra
@@ -337,8 +339,6 @@ void RTE::new_intra(TNode *V, bool stub, uns16 stub_cost, int _index)
 		// Update routing table entry
 		r_type = RT_SPF;
 		cost = total_cost;
-		set_origin(V);
-		set_area(V->area()->id());
 	}
 	// Nodes other than the root have next hops in T_Node
 	if (V != V->area()->mylsa)
@@ -583,7 +583,7 @@ void OSPF::update_brs()
 
     // Put all our own router-LSAs onto candidate list
     while ((ap = iter.get_next())) {
-		rtrLSA *root;
+		rtrLSA *root, *lsa;
 		bool local_changed;
 		RTRrte *abr;
 		AVLsearch rrsearch(&ap->abr_tbl);
@@ -592,8 +592,16 @@ void OSPF::update_brs()
 
 		while ((abr = (RTRrte *)rrsearch.next())) {
 			// ABR now unreachable?
-			if ((abr->type() == RT_SPF) &&
+			if ((abr->type() == RT_SPF || abr->has_intra_path) &&
 			((n_dijkstras & 1) != abr->dijk_run)) {
+				if (n_area > 1) {
+					if ((lsa = (rtrLSA *) abr->get_origin())) {
+						if ((lsa->abr)) {
+							lsa->abr->cost = LSInfinity;
+							abr_changed = true;
+						}
+					}
+				}
 				abr->declare_unreachable();
 				abr->changed = true;
 			}
@@ -632,10 +640,43 @@ void OSPF::rt_scan()
 
     while ((rte = iter.nextrte())) {
 	// Delete old intra-area routes
-		if (rte->intra_area() &&
+		if ((rte->intra_area() || rte->has_intra_path) &&
 			((n_dijkstras & 1) != rte->dijk_run)) {
-			rte->declare_unreachable();
-			rte->changed = true;
+				if (n_area > 1) {
+					// Prematurely age the prefix we originated for this RTE
+					if (rte->prefixes) {
+						overlayPrefixLSA *pref;
+						for (pref = rte->prefixes; pref; pref = (overlayPrefixLSA *) pref->link) {
+							if (pref->lsa->adv_rtr() == my_id()) {
+								pref->lsa->adv_opq = false;
+								pref->lsa->reoriginate(false);
+							}
+						}
+					}
+
+					// There are still prefixes left for this RTE, so we only declare the route
+					// unreachable via its intra-area route.
+					if (rte->prefixes) {
+						rte->has_intra_path = false;
+						rte->intra_cost = LSInfinity;
+						rte->intra_path = 0;
+						rte->adv_overlay = false;
+					}
+					// There are no prefixes left available for this destination, so we also
+					// age the originated Summ-LSA for this destination
+					else {
+						summLSA *my_lsa;
+						my_lsa = rte->my_summary_lsa();
+						if (my_lsa)
+							lsa_flush(my_lsa);
+						rte->declare_unreachable();
+					}
+					rte->changed = true;
+				}
+				else {
+					rte->declare_unreachable();
+					rte->changed = true;
+				}
 		}
 		// Look at summary-LSAs
 		if ((n_area == 1) && (rte->inter_area() || rte->summs))
@@ -661,37 +702,6 @@ void OSPF::rt_scan()
 						orig_prefixLSA(rte);
 					else { // If there is only 1 ABR in the network
 						sl_orig(rte);
-					}
-				}
-				else if (rte->has_been_adv) {
-					// Prematurely age the prefix we originated for this RTE
-					if (rte->prefixes) {
-						overlayPrefixLSA *pref;
-						for (pref = rte->prefixes; pref; pref = (overlayPrefixLSA *) pref->link) {
-							if (pref->lsa->adv_rtr() == my_id()) {
-								pref->lsa->adv_opq = false;
-								pref->lsa->reoriginate(false);
-							}
-						}
-					}
-
-					// There are still prefixes left for this RTE, so we only declare the route
-					// unreachable via its intra-area route.
-					if (rte->prefixes) {
-						rte->has_intra_path = false;
-						rte->intra_cost = LSInfinity;
-						rte->intra_path = 0;
-						rte->adv_overlay = false;
-						return;
-					}
-					// There are no prefixes left available for this destination, so we also
-					// age the originated Summ-LSA for this destination
-					else {
-						summLSA *my_lsa;
-						my_lsa = rte->my_summary_lsa();
-						if (my_lsa)
-							lsa_flush(my_lsa);
-						rte->declare_unreachable();
 					}
 				}
 			}
