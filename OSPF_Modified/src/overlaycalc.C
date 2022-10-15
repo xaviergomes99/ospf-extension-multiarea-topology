@@ -236,6 +236,7 @@ void OSPF::adv_best_prefix(INrte *rte)
             rte->has_been_adv = true;
             rte->in_use = in_use;
             sl_orig(rte);
+            rte->sys_install();
         }
     }
 }
