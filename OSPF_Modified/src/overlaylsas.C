@@ -103,14 +103,15 @@ overlayAsbrLSA::~overlayAsbrLSA()
  * costs to the same ABR.
  */
 
-ABRNbr::ABRNbr(rtrLSA *lsa, SpfArea *a) : AVLitem(lsa->adv_rtr(), a->id()) {
+ABRNbr::ABRNbr(rtrLSA *lsa, SpfArea *a) {
     rid = lsa->adv_rtr();
     rtr = lsa;
     cost = LSInfinity;
     area = a;
     use_in_lsa = false;
     rtr->abr = this;
-    ospf->ABRNbrs.add(this);
+    next = ospf->ABRNbrs;
+    ospf->ABRNbrs = this;
 }
 
 /* Destructor for the ABRNbr class
@@ -182,20 +183,20 @@ void OSPF::orig_abrLSA() {
     body = &body_start;
 
     // Clear previous additions
-    abrNbr = (ABRNbr *) ABRNbrs.sllhead;
-    for (; abrNbr; abrNbr = (ABRNbr *) abrNbr->sll) {
+    abrNbr = ABRNbrs;
+    for (; abrNbr; abrNbr = abrNbr->next) {
         abrNbr->use_in_lsa = false;
     }
 
     // Iterate through all ABR neighbor entries
-    abrNbr = (ABRNbr *) ABRNbrs.sllhead;
-    for (; abrNbr; abrNbr = (ABRNbr *) abrNbr->sll) {
+    abrNbr = ABRNbrs;
+    for (; abrNbr; abrNbr = abrNbr->next) {
         cost = abrNbr->cost;
         // Cost is assigned, so we add to the LSA
         if (cost < LSInfinity) {
             found = false;
-            abrInLsa = (ABRNbr *) ABRNbrs.sllhead;
-            for (; abrInLsa; abrInLsa = (ABRNbr *) abrInLsa->sll) {
+            abrInLsa = ABRNbrs;
+            for (; abrInLsa; abrInLsa = abrInLsa->next) {
                 // There is already an entry for this ABR
                 if ((abrInLsa->get_rid() == abrNbr->rid) && abrInLsa->use_in_lsa) {
                     found = true;
@@ -216,8 +217,8 @@ void OSPF::orig_abrLSA() {
     }
 
     // Add only the lower cost entries
-    abrNbr = (ABRNbr *) ABRNbrs.sllhead;
-    for (; abrNbr; abrNbr = (ABRNbr *) abrNbr->sll) {
+    abrNbr = ABRNbrs;
+    for (; abrNbr; abrNbr = abrNbr->next) {
         if (abrNbr->use_in_lsa) {
             curr.metric = abrNbr->cost;
             curr.neigh_rid = ntoh32(abrNbr->rid);
@@ -238,11 +239,10 @@ void OSPF::orig_abrLSA() {
     }
     // No neighbors have been added, so we clear the ABRNbr list
     else if (first_abrLSA_sent) {
-        abrNbr = (ABRNbr *) ABRNbrs.sllhead;
-        for (; abrNbr; abrNbr = (ABRNbr *) abrNbr->sll) {
+        abrNbr = ABRNbrs;
+        for (; abrNbr; abrNbr = abrNbr->next) {
             abrNbr->rtr->abr = 0;
         }
-        ABRNbrs.clear();
         ospf->my_abr_lsa->lsa->adv_opq = false;
         ospf->my_abr_lsa->lsa->reoriginate(false);
         ospf->first_abrLSA_sent = false;

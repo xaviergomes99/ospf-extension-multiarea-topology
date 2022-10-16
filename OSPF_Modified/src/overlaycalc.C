@@ -181,8 +181,8 @@ void OSPF::update_path_overlay(RTE *rte, overlayAbrLSA *abr, uns32 cost)
     if (!abr->next_abr_hop)
         set_overlay_nh();
     next_abr = abr->next_abr_hop->lsa->adv_rtr();
-    nbr = (ABRNbr *) ABRNbrs.sllhead;
-    for (; nbr; nbr = (ABRNbr *) nbr->sll) {
+    nbr = ABRNbrs;
+    for (; nbr; nbr = nbr->next) {
         if ((nbr->get_rid() == next_abr) && nbr->use_in_lsa) {
             found = true;
             break;
