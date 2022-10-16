@@ -177,7 +177,7 @@ class OSPF : public ConfigItem {
     int asbr_seq;   // Next value for the opaque-ID to be assigned to a ASBR-LSA
     ABRhdr body_start;  // Placeholder for the origination of our ABR-LSAs
     overlayAbrLSA *my_abr_lsa;    // Our own ABR-LSA
-    ABRNbr *ABRNbrs;    // List of all our neighboring ABRs
+    AVLtree ABRNbrs;    // List of all our neighboring ABRs
     AVLtree abrLSAs;    // List of all ABR-LSAs
     AVLtree prefixLSAs; // List of all Prefix-LSAs 
     AVLtree asbrLSAs;   // List of all ASBR-LSAs

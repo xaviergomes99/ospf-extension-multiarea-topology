@@ -131,7 +131,6 @@ OSPF::OSPF(uns32 rtid, SPFtime grace) : myid(rtid)
     calc_overlay = false;
     asbr_seq = 0;
     my_abr_lsa = 0;
-    ABRNbrs = 0;
 
     // Initialize logging
     logno = 0;
@@ -204,6 +203,7 @@ OSPF::~OSPF()
     ASBRtree.clear();
     ABRtree.clear();
     dna_flushq.clear();
+    ABRNbrs.clear();
     abrLSAs.clear();
     prefixLSAs.clear();
     asbrLSAs.clear();

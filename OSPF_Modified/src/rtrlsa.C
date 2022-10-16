@@ -502,7 +502,9 @@ void rtrLSA::parse(LShdr *hdr)
 			// There is a link to a ABRNbr created, but it is wrong
 			else if ((abr->get_rid() != orig_rtr) || (abr->get_rtrLSA() != this)) {
 				abr->rid = orig_rtr;
+				abr->_index1 = orig_rtr;
 				abr->area = area();
+				abr->_index2 = area()->id();
 				abr->rtr = this;
 				abr->cost = LSInfinity;
 			}

@@ -6,13 +6,12 @@
 
 class rtrLSA;
 
-class ABRNbr {
+class ABRNbr : public AVLitem {
     rtid_t rid;     // ABR neighbor RID
     uns32 cost;     // Intra-area shortest path cost
     rtrLSA *rtr;    // Link to corresponding Router-LSA
     SpfArea *area;  // Area in which we are neighbors with the ABR
     bool use_in_lsa;    // This ABRNbr is to be considered when building the ABR-LSA
-    ABRNbr *next;   // Link together
 public:
     ABRNbr(rtrLSA *lsa, SpfArea *a);
     virtual ~ABRNbr();
