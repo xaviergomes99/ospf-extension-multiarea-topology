@@ -674,7 +674,7 @@ void INrte::sys_install()
     }
 
     last_mpath = r_mpath;
-    if (ospf->spflog(msgno, 3))
+    if (ospf->spflog(msgno, 5))
 	ospf->log(this);
 
     /* At this point we must decide whether to
