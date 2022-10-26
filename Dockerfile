@@ -12,7 +12,5 @@ iputils-ping \
 iproute2 \
 && rm -rf /var/lib/apt/lists/*
 
-COPY OSPF_John_Moy_Base/ /root/ospf/.
-
-WORKDIR /root/ospf/linux
-RUN make
+COPY OSPF_John_Moy_Base/ /root/ospf_base/.
+COPY OSPF_Modified/ /root/ospf_ext/.
